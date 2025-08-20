@@ -106,16 +106,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { projectName, fileName } = req.params;
     const { content } = req.body;
     
-    if (!content) {
+    if (content === undefined || content === null) {
       return res.status(400).json({ error: "File content is required" });
     }
     
     // Mock file saving - in real implementation, this would write to actual files
+    // This will replace existing files or create new ones
     if (storage.saveFile) {
       storage.saveFile(projectName, fileName, content);
     }
     
-    res.json({ success: true, message: "File saved successfully" });
+    res.json({ success: true, message: "File updated successfully" });
   });
 
   const httpServer = createServer(app);

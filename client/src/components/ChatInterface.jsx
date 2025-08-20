@@ -42,11 +42,12 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
 
             IMPORTANT RULES:
             1. Keep responses concise - avoid showing large code blocks in chat
-            2. When creating files, use this exact format: CREATE_FILE: filename.ext \`\`\`file content here\`\`\`
+            2. When creating OR editing files, use this exact format: CREATE_FILE: filename.ext \`\`\`file content here\`\`\`
             3. For websites, create complete HTML files with inline CSS and JavaScript
-            4. After using CREATE_FILE, provide a brief description of what you created
+            4. After using CREATE_FILE, provide a brief description of what you created/edited
             5. Focus on practical solutions rather than lengthy explanations
             6. When building websites, make them fully functional with inline styles and scripts
+            7. IMPORTANT: When user asks to "edit" or "modify" or "update" a website/file, always provide the COMPLETE updated file content using CREATE_FILE format - this will replace the existing file
             
             Example: If user asks for a website, respond with:
             "I'll create a complete website for you.
@@ -66,6 +67,8 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
             \`\`\`
             
             The website includes [brief description of features]."
+            
+            When editing existing files, always provide the FULL updated code using the same CREATE_FILE format.
             
             Provide helpful guidance while keeping responses compact and actionable.`
           },
@@ -91,7 +94,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
             const assistantMessage = {
               id: Date.now() + 1,
               role: 'assistant',
-              content: `✅ I've successfully created "${fileName}" for you! You can view and edit it in the Files tab, or see the preview in the Preview tab if it's an HTML file.`,
+              content: `✅ I've successfully updated "${fileName}" for you! You can view the changes in the Files tab, or see the preview in the Preview tab if it's an HTML file.`,
               timestamp: new Date().toISOString(),
               usage: result.usage,
               fileCreated: fileName
@@ -102,7 +105,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
             const assistantMessage = {
               id: Date.now() + 1,
               role: 'assistant',
-              content: `❌ I couldn't save the file "${fileName}" automatically. Please try again or create it manually in the Files tab.`,
+              content: `❌ I couldn't update the file "${fileName}" automatically. Please try again or edit it manually in the Files tab.`,
               timestamp: new Date().toISOString(),
               usage: result.usage,
               isError: true
@@ -203,7 +206,8 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
                 <li>"Create a simple website"</li>
                 <li>"Build a portfolio page"</li>
                 <li>"Make a todo app"</li>
-                <li>"Create a landing page"</li>
+                <li>"Edit the website to add a contact form"</li>
+                <li>"Update the homepage with a dark theme"</li>
               </ul>
             </div>
           </div>
