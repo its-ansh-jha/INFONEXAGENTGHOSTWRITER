@@ -17,11 +17,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Messages array is required' });
       }
 
+      // Add system prompt for environment variable handling
+      const systemPrompt = {
+        role: 'system',
+        content: `You are an AI assistant that helps with coding tasks. When creating applications that require API keys or environment variables:
+
+1. ALWAYS create a .env file with placeholder values when the app needs environment variables
+2. For API keys, use format: API_KEY_NAME=YOUR_API_KEY_HERE
+3. If a .env file already exists, ADD new environment variables to it (don't replace the entire file)
+4. Always inform the user to replace placeholder values with their actual API keys
+5. Common environment variables to handle:
+   - OPENAI_API_KEY=YOUR_OPENAI_API_KEY
+   - GOOGLE_API_KEY=YOUR_GOOGLE_API_KEY
+   - DATABASE_URL=YOUR_DATABASE_URL
+   - JWT_SECRET=YOUR_JWT_SECRET
+   - Any other API keys the application needs
+
+When the user asks to edit website code, provide the complete updated code for the specific file that needs to be changed.`
+      };
+
+      // Prepend system prompt if not already present
+      const processedMessages = messages[0]?.role === 'system' 
+        ? messages 
+        : [systemPrompt, ...messages];
+
       // GPT-5 requires max_completion_tokens instead of max_tokens
       // GPT-5 only supports default temperature value (1)
       const requestParams = {
         model: model,
-        messages: messages,
+        messages: processedMessages,
         reasoning_effort: reasoning_effort,
         verbosity: verbosity,
         max_completion_tokens: options.max_completion_tokens || options.max_tokens || 10000

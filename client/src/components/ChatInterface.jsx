@@ -48,10 +48,10 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
             5. Focus on practical solutions rather than lengthy explanations
             6. When building websites, make them fully functional with inline styles and scripts
             7. IMPORTANT: When user asks to "edit" or "modify" or "update" a website/file, always provide the COMPLETE updated file content using CREATE_FILE format - this will replace the existing file
-            
+
             Example: If user asks for a website, respond with:
             "I'll create a complete website for you.
-            
+
             CREATE_FILE: index.html
             \`\`\`
             <!DOCTYPE html>
@@ -65,11 +65,11 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
             </body>
             </html>
             \`\`\`
-            
+
             The website includes [brief description of features]."
-            
+
             When editing existing files, always provide the FULL updated code using the same CREATE_FILE format.
-            
+
             Provide helpful guidance while keeping responses compact and actionable.`
           },
           ...messages.map(msg => ({ role: msg.role, content: msg.content })),
@@ -79,52 +79,61 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
       });
 
       const result = await response.json();
-      
-      if (result.success && result.data.choices?.[0]?.message) {
-        const content = result.data.choices[0].message.content;
-        
-        // Check if the AI wants to create a file
-        const fileMatch = content.match(/CREATE_FILE:\s*(\S+)\s*```([\s\S]*?)```/);
-        if (fileMatch && selectedProject) {
-          const [, fileName, fileContent] = fileMatch;
-          try {
-            await api.saveFile(selectedProject.name, fileName, fileContent.trim());
-            
-            // Show only a simple success message without the code
-            const assistantMessage = {
-              id: Date.now() + 1,
-              role: 'assistant',
-              content: `✅ I've successfully updated "${fileName}" for you! You can view the changes in the Files tab, or see the preview in the Preview tab if it's an HTML file.`,
-              timestamp: new Date().toISOString(),
-              usage: result.usage,
-              fileCreated: fileName
-            };
-            setMessages(prev => [...prev, assistantMessage]);
-          } catch (error) {
-            console.error('Error saving file:', error);
-            const assistantMessage = {
-              id: Date.now() + 1,
-              role: 'assistant',
-              content: `❌ I couldn't update the file "${fileName}" automatically. Please try again or edit it manually in the Files tab.`,
-              timestamp: new Date().toISOString(),
-              usage: result.usage,
-              isError: true
-            };
-            setMessages(prev => [...prev, assistantMessage]);
+
+      if (result.success && result.data) {
+        const assistantContent = result.data.choices[0]?.message?.content || 'No response received';
+
+        const assistantMessage = {
+          id: Date.now() + 1,
+          role: 'assistant',
+          content: assistantContent,
+          timestamp: new Date().toISOString(),
+          usage: result.data.usage
+        };
+
+        setMessages(prev => [...prev, assistantMessage]);
+
+        // Check if the user requested to edit website and AI provided code
+        const userInput = input.trim().toLowerCase();
+        if (userInput.includes('edit') && (userInput.includes('website') || userInput.includes('web') || userInput.includes('html') || userInput.includes('css') || userInput.includes('js'))) {
+          // Extract code blocks from AI response
+          const fileMatch = assistantContent.match(/CREATE_FILE:\s*(\S+)\s*```([\s\S]*?)```/);
+          if (fileMatch && selectedProject) {
+            const [, fileName, fileContent] = fileMatch;
+            try {
+              await api.saveFile(selectedProject.name, fileName, fileContent.trim());
+
+              // Show only a simple success message without the code
+              const assistantMessage = {
+                id: Date.now() + 1,
+                role: 'assistant',
+                content: `✅ I've successfully updated "${fileName}" for you! You can view the changes in the Files tab, or see the preview in the Preview tab if it's an HTML file.`,
+                timestamp: new Date().toISOString(),
+                usage: result.data.usage,
+                fileCreated: fileName
+              };
+              setMessages(prev => [...prev, assistantMessage]);
+            } catch (error) {
+              console.error('Error saving file:', error);
+              const assistantMessage = {
+                id: Date.now() + 1,
+                role: 'assistant',
+                content: `❌ I couldn't update the file "${fileName}" automatically. Please try again or edit it manually in the Files tab.`,
+                timestamp: new Date().toISOString(),
+                usage: result.data.usage,
+                isError: true
+              };
+              setMessages(prev => [...prev, assistantMessage]);
+            }
+          } else {
+            // If the AI didn't use CREATE_FILE format but the user asked to edit,
+            // we might still want to attempt to save if a file can be inferred.
+            // This part is less reliable and depends on AI's response format.
+            // For now, we'll rely on the explicit CREATE_FILE format.
           }
-        } else {
-          // Display the full AI response content
-          const assistantMessage = {
-            id: Date.now() + 1,
-            role: 'assistant',
-            content: content || 'No response content received',
-            timestamp: new Date().toISOString(),
-            usage: result.usage
-          };
-          setMessages(prev => [...prev, assistantMessage]);
         }
       } else {
-        throw new Error('No valid response received from AI');
+        throw new Error(result.error || 'Unknown error occurred');
       }
     } catch (error) {
       console.error('Chat error:', error);
@@ -143,7 +152,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
 
   const renderMessage = (message) => {
     const isUser = message.role === 'user';
-    
+
     return (
       <div
         key={message.id}
