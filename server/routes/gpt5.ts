@@ -18,13 +18,13 @@ router.post('/chat', async (req, res) => {
     }
 
     // the newest OpenAI model is "gpt-5" which was released August 7, 2024. do not change this unless explicitly requested by the user
+    // GPT-5 only supports default temperature and requires max_completion_tokens
     const response = await openai.chat.completions.create({
       model: model,
       messages: messages,
       reasoning_effort: reasoning_effort,
       verbosity: verbosity,
-      temperature: options.temperature || 0.7,
-      max_tokens: options.max_tokens || 4000,
+      max_completion_tokens: options.max_completion_tokens || options.max_tokens || 4000,
       ...options
     });
 
@@ -78,13 +78,13 @@ router.post('/generate-code', async (req, res) => {
     };
 
     // the newest OpenAI model is "gpt-5" which was released August 7, 2024. do not change this unless explicitly requested by the user
+    // GPT-5 only supports default temperature and requires max_completion_tokens
     const response = await openai.chat.completions.create({
       model: 'gpt-5',
       messages: [systemMessage, userMessage],
       reasoning_effort: 'medium',
       verbosity: 'high',
-      temperature: 0.3, // Lower temperature for more consistent code generation
-      max_tokens: 4000,
+      max_completion_tokens: 4000,
       ...options
     });
 

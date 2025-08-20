@@ -18,13 +18,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // GPT-5 requires max_completion_tokens instead of max_tokens
+      // GPT-5 only supports default temperature value (1)
       const requestParams = {
         model: model,
         messages: messages,
         reasoning_effort: reasoning_effort,
         verbosity: verbosity,
-        max_completion_tokens: options.max_completion_tokens || options.max_tokens || 4000,
-        temperature: 0.7
+        max_completion_tokens: options.max_completion_tokens || options.max_tokens || 4000
       };
 
       const response = await openai.chat.completions.create(requestParams);
