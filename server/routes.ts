@@ -11,7 +11,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GPT-5 Chat endpoint
   app.post('/api/gpt5/chat', async (req, res) => {
     try {
-      const { model = 'gpt-4o', messages, reasoning_effort = 'minimal', verbosity = 'medium', ...options } = req.body;
+      const { model = 'gpt-5', messages, reasoning_effort = 'minimal', verbosity = 'medium', ...options } = req.body;
 
       if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: 'Messages array is required' });
