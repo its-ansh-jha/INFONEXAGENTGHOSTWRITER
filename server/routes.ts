@@ -17,11 +17,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Messages array is required' });
       }
 
-      // Using gpt-4o for now as it's more stable than gpt-5 preview
+      // GPT-5 requires max_completion_tokens instead of max_tokens
       const requestParams = {
         model: model,
         messages: messages,
-        max_tokens: options.max_tokens || options.max_completion_tokens || 4000,
+        reasoning_effort: reasoning_effort,
+        verbosity: verbosity,
+        max_completion_tokens: options.max_completion_tokens || options.max_tokens || 4000,
         temperature: 0.7
       };
 
