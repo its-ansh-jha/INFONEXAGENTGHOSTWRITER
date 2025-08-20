@@ -12,6 +12,7 @@ export interface IStorage {
   getProjectFiles?(projectName: string): Array<{name: string, type: string}>;
   getFileContent?(projectName: string, fileName: string): string;
   saveFile?(projectName: string, fileName: string, content: string): void;
+  createOrUpdateEnvFile?(projectName: string, envVars: Record<string, string>): string;
 }
 
 export class MemStorage implements IStorage {
@@ -43,10 +44,10 @@ export class MemStorage implements IStorage {
   getProjectFiles(projectName: string): Array<{name: string, type: string}> {
     const files = this.projectFiles.get(projectName);
     if (!files) return [];
-    
+
     return Array.from(files.keys()).map(fileName => ({
       name: fileName,
-      type: fileName.endsWith('.html') ? 'html' : 
+      type: fileName.endsWith('.html') ? 'html' :
             fileName.endsWith('.css') ? 'css' :
             fileName.endsWith('.js') ? 'javascript' : 'text'
     }));
@@ -61,9 +62,31 @@ export class MemStorage implements IStorage {
     if (!this.projectFiles.has(projectName)) {
       this.projectFiles.set(projectName, new Map());
     }
-    
+
     const files = this.projectFiles.get(projectName)!;
     files.set(fileName, content);
+  }
+
+  createOrUpdateEnvFile(projectName: string, envVars: Record<string, string>): string {
+    const existingContent = this.getFileContent(projectName, '.env') || '';
+    const existingLines = existingContent.split('\n').filter(line => line.trim());
+    const existingVars = new Set<string>();
+
+    existingLines.forEach(line => {
+      const [key] = line.split('=');
+      if (key) existingVars.add(key.trim());
+    });
+
+    let newContent = existingContent;
+
+    Object.entries(envVars).forEach(([key, value]) => {
+      if (!existingVars.has(key)) {
+        newContent += (newContent && !newContent.endsWith('\n') ? '\n' : '') + `${key}=${value}\n`;
+      }
+    });
+
+    this.saveFile(projectName, '.env', newContent);
+    return newContent;
   }
 }
 

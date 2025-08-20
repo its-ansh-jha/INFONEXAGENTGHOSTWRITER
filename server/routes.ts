@@ -17,11 +17,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Messages array is required' });
       }
 
+      // Add system prompt for environment variable management
+      const systemPrompt = {
+        role: 'system',
+        content: `You are an AI coding assistant. When creating web applications or projects that require API keys or environment variables:
+
+1. ALWAYS create a .env file when the app needs environment variables to run
+2. Use placeholder values like YOUR_API_KEY, YOUR_SECRET_KEY, etc.
+3. Add each new environment variable on a new line in the .env file
+4. Common variables to include:
+   - OPENAI_API_KEY=YOUR_API_KEY
+   - GOOGLE_API_KEY=YOUR_API_KEY
+   - DATABASE_URL=YOUR_DATABASE_URL
+   - JWT_SECRET=YOUR_JWT_SECRET
+   - API_BASE_URL=YOUR_API_BASE_URL
+
+5. Always inform the user to replace placeholder values with their actual keys
+6. If the .env file already exists, append new variables to it
+7. Include instructions in your response about updating the .env file
+
+Example: "I've created a .env file with the required environment variables. Please replace YOUR_API_KEY with your actual OpenAI API key."
+
+Always prioritize security and never hardcode sensitive information in the code.`
+      };
+
+      // Prepend system prompt to messages if not already present
+      const messagesWithSystem = messages[0]?.role === 'system' 
+        ? messages 
+        : [systemPrompt, ...messages];
+
       // GPT-5 requires max_completion_tokens instead of max_tokens
       // GPT-5 only supports default temperature value (1)
       const requestParams = {
         model: model,
-        messages: messages,
+        messages: messagesWithSystem,
         reasoning_effort: reasoning_effort,
         verbosity: verbosity,
         max_completion_tokens: options.max_completion_tokens || options.max_tokens || 10000
@@ -81,6 +110,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
     
     res.json({ success: true, project: newProject });
+  });
+
+  // Environment variables management endpoint
+  app.post("/api/projects/:projectName/env", (req, res) => {
+    const { projectName } = req.params;
+    const { envVars } = req.body;
+    
+    if (!envVars || typeof envVars !== 'object') {
+      return res.status(400).json({ error: "Environment variables object is required" });
+    }
+    
+    try {
+      const updatedContent = storage.createOrUpdateEnvFile ? 
+        storage.createOrUpdateEnvFile(projectName, envVars) : '';
+      
+      res.json({ 
+        success: true, 
+        message: "Environment file updated successfully",
+        content: updatedContent
+      });
+    } catch (error) {
+      console.error('Error updating environment file:', error);
+      res.status(500).json({ error: "Failed to update environment file" });
+    }
   });
 
   // File management endpoints
