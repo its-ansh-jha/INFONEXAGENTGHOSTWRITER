@@ -1,6 +1,8 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import ChatInterface from './ChatInterface';
+import FileManager from './FileManager';
+import PreviewPane from './PreviewPane';
 
 const MainContent = ({ 
   selectedProject, 
@@ -49,6 +51,13 @@ const MainContent = ({
             >
               Files
             </Button>
+            <Button
+              variant={activeTab === 'preview' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('preview')}
+              className="text-sm"
+            >
+              Preview
+            </Button>
           </div>
         </div>
       </header>
@@ -78,16 +87,15 @@ const MainContent = ({
               selectedSession={selectedSession}
             />
           </div>
-        ) : (
-          <div className="flex-1 p-6">
-            <div className="bg-vscode-surface rounded-lg p-6 h-full">
-              <h3 className="text-lg font-semibold text-vscode-text mb-4">Project Files</h3>
-              <div className="text-vscode-text-muted">
-                File explorer will be implemented here.
-              </div>
-            </div>
+        ) : activeTab === 'files' ? (
+          <div className="flex-1 bg-vscode-surface">
+            <FileManager selectedProject={selectedProject} />
           </div>
-        )}
+        ) : activeTab === 'preview' ? (
+          <div className="flex-1 bg-vscode-surface">
+            <PreviewPane selectedProject={selectedProject} />
+          </div>
+        ) : null}
       </div>
     </main>
   );

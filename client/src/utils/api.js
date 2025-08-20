@@ -37,6 +37,14 @@ export const api = {
       body: JSON.stringify(data),
     }),
   },
+
+  // File Management
+  getProjectFiles: (projectName) => apiFetch(`${API_BASE}/projects/${projectName}/files`),
+  getFileContent: (projectName, fileName) => apiFetch(`${API_BASE}/projects/${projectName}/files/${fileName}`),
+  saveFile: (projectName, fileName, content) => apiFetch(`${API_BASE}/projects/${projectName}/files/${fileName}`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  }),
   
   // Cursor API (legacy - keeping for compatibility)
   cursor: {

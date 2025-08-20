@@ -38,16 +38,36 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert coding assistant powered by GPT-4o. You're helping with the project "${selectedProject?.displayName || 'Unknown Project'}". 
+            content: `You are an expert coding assistant for the project "${selectedProject?.displayName || 'Unknown Project'}". 
+
+            IMPORTANT RULES:
+            1. Keep responses concise - avoid showing large code blocks in chat
+            2. When creating files, use this exact format: CREATE_FILE: filename.ext \`\`\`file content here\`\`\`
+            3. For websites, create complete HTML files with inline CSS and JavaScript
+            4. After using CREATE_FILE, provide a brief description of what you created
+            5. Focus on practical solutions rather than lengthy explanations
+            6. When building websites, make them fully functional with inline styles and scripts
             
-            Key capabilities:
-            - Generate clean, well-documented code
-            - Analyze and debug existing code
-            - Explain complex programming concepts
-            - Suggest best practices and optimizations
-            - Help with project architecture decisions
+            Example: If user asks for a website, respond with:
+            "I'll create a complete website for you.
             
-            Always provide practical, actionable advice with code examples when relevant.`
+            CREATE_FILE: index.html
+            \`\`\`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>/* CSS here */</style>
+            </head>
+            <body>
+                <!-- HTML content -->
+                <script>/* JS here */</script>
+            </body>
+            </html>
+            \`\`\`
+            
+            The website includes [brief description of features]."
+            
+            Provide helpful guidance while keeping responses compact and actionable.`
           },
           ...messages.map(msg => ({ role: msg.role, content: msg.content })),
           { role: 'user', content: input.trim() }
@@ -58,16 +78,50 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
       const result = await response.json();
       
       if (result.success && result.data.choices?.[0]?.message) {
-        const assistantMessage = {
-          id: Date.now() + 1,
-          role: 'assistant',
-          content: result.data.choices[0].message.content,
-          timestamp: new Date().toISOString(),
-          usage: result.usage
-        };
-        setMessages(prev => [...prev, assistantMessage]);
+        const content = result.data.choices[0].message.content;
+        
+        // Check if the AI wants to create a file
+        const fileMatch = content.match(/CREATE_FILE:\s*(\S+)\s*```([\s\S]*?)```/);
+        if (fileMatch && selectedProject) {
+          const [, fileName, fileContent] = fileMatch;
+          try {
+            await api.saveFile(selectedProject.name, fileName, fileContent.trim());
+            // Replace the create file command with a success message
+            const cleanContent = content.replace(/CREATE_FILE:[\s\S]*?```/, `I've created the file "${fileName}" for you. You can view and edit it in the Files tab, or see the preview in the Preview tab if it's an HTML file.`);
+            
+            const assistantMessage = {
+              id: Date.now() + 1,
+              role: 'assistant',
+              content: cleanContent,
+              timestamp: new Date().toISOString(),
+              usage: result.usage,
+              fileCreated: fileName
+            };
+            setMessages(prev => [...prev, assistantMessage]);
+          } catch (error) {
+            console.error('Error saving file:', error);
+            const assistantMessage = {
+              id: Date.now() + 1,
+              role: 'assistant',
+              content: content + `\n\nNote: I couldn't save the file automatically. You can copy the code above and save it manually in the Files tab.`,
+              timestamp: new Date().toISOString(),
+              usage: result.usage,
+              isError: true
+            };
+            setMessages(prev => [...prev, assistantMessage]);
+          }
+        } else {
+          const assistantMessage = {
+            id: Date.now() + 1,
+            role: 'assistant',
+            content: content,
+            timestamp: new Date().toISOString(),
+            usage: result.usage
+          };
+          setMessages(prev => [...prev, assistantMessage]);
+        }
       } else {
-        throw new Error('Invalid response from GPT-5');
+        throw new Error('Invalid response from AI');
       }
     } catch (error) {
       console.error('Chat error:', error);
@@ -109,9 +163,14 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
               {new Date(message.timestamp).toLocaleTimeString()}
             </span>
           </div>
-          <div className="whitespace-pre-wrap">
+          <div className="whitespace-pre-wrap max-h-96 overflow-y-auto">
             {message.content}
           </div>
+          {message.fileCreated && (
+            <div className="text-xs bg-green-900/20 text-green-400 px-2 py-1 rounded mt-2">
+              ✓ Created file: {message.fileCreated}
+            </div>
+          )}
           {message.usage && (
             <div className="text-xs opacity-70 mt-2">
               Tokens: {message.usage.total_tokens} ({message.usage.prompt_tokens} + {message.usage.completion_tokens})
@@ -141,10 +200,10 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
             <div className="text-sm text-left max-w-md mx-auto">
               <p className="mb-2">Try asking me:</p>
               <ul className="list-disc list-inside space-y-1">
-                <li>"Create a React component for a todo list"</li>
-                <li>"Help me debug this JavaScript function"</li>
-                <li>"Explain how to implement authentication"</li>
-                <li>"What's the best way to structure this project?"</li>
+                <li>"Create a simple website"</li>
+                <li>"Build a portfolio page"</li>
+                <li>"Make a todo app"</li>
+                <li>"Create a landing page"</li>
               </ul>
             </div>
           </div>

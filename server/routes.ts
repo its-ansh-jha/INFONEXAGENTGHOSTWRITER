@@ -81,6 +81,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true, project: newProject });
   });
 
+  // File management endpoints
+  app.get("/api/projects/:projectName/files", (req, res) => {
+    const { projectName } = req.params;
+    
+    // Mock file system - in real implementation, this would read from actual files
+    const mockFiles = storage.getProjectFiles ? storage.getProjectFiles(projectName) : [];
+    
+    res.json({ files: mockFiles });
+  });
+
+  app.get("/api/projects/:projectName/files/:fileName", (req, res) => {
+    const { projectName, fileName } = req.params;
+    
+    // Mock file content - in real implementation, this would read actual file content
+    const content = storage.getFileContent ? storage.getFileContent(projectName, fileName) : '';
+    
+    res.json({ content });
+  });
+
+  app.post("/api/projects/:projectName/files/:fileName", (req, res) => {
+    const { projectName, fileName } = req.params;
+    const { content } = req.body;
+    
+    if (!content) {
+      return res.status(400).json({ error: "File content is required" });
+    }
+    
+    // Mock file saving - in real implementation, this would write to actual files
+    if (storage.saveFile) {
+      storage.saveFile(projectName, fileName, content);
+    }
+    
+    res.json({ success: true, message: "File saved successfully" });
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
