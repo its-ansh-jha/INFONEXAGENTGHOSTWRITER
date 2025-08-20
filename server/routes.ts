@@ -17,6 +17,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Messages array is required' });
       }
 
+      // Add system prompt for environment variable handling if not already present
+      const hasSystemPrompt = messages.some(msg => msg.role === 'system');
+      if (!hasSystemPrompt) {
+        messages.unshift({
+          role: 'system',
+          content: `You are an AI assistant that helps with coding tasks. When creating applications that require API keys or sensitive configuration:
+
+1. ALWAYS create a .env file when the application needs environment variables
+2. Use placeholder values like YOUR_API_KEY, YOUR_SECRET_KEY, etc.
+3. Tell the user to replace these placeholders with their actual values
+4. If additional environment variables are needed later, append them to the existing .env file
+5. Common environment variables to create:
+   - OPENAI_API_KEY=YOUR_API_KEY
+   - GOOGLE_API_KEY=YOUR_API_KEY  
+   - DATABASE_URL=YOUR_DATABASE_URL
+   - JWT_SECRET=YOUR_JWT_SECRET
+   - STRIPE_SECRET_KEY=YOUR_STRIPE_KEY
+
+Example .env file format:
+OPENAI_API_KEY=YOUR_API_KEY
+GOOGLE_API_KEY=YOUR_API_KEY
+
+Always inform users: "I've created a .env file with placeholder values. Please edit this file and replace YOUR_API_KEY with your actual API keys."`
+        });
+      }
+
       // GPT-5 requires max_completion_tokens instead of max_tokens
       // GPT-5 only supports default temperature value (1)
       const requestParams = {
@@ -104,19 +130,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/projects/:projectName/files/:fileName", (req, res) => {
     const { projectName, fileName } = req.params;
-    const { content } = req.body;
+    const { content, append = false } = req.body;
     
     if (content === undefined || content === null) {
       return res.status(400).json({ error: "File content is required" });
     }
     
+    let finalContent = content;
+    
+    // Handle .env file appending
+    if (fileName === '.env' && append) {
+      const existingContent = storage.getFileContent ? storage.getFileContent(projectName, fileName) : '';
+      if (existingContent) {
+        // Check if the new environment variable already exists
+        const existingLines = existingContent.split('\n').filter(line => line.trim());
+        const newLines = content.split('\n').filter(line => line.trim());
+        
+        const newVars = [];
+        newLines.forEach(newLine => {
+          const varName = newLine.split('=')[0];
+          const existsAlready = existingLines.some(existingLine => 
+            existingLine.split('=')[0] === varName
+          );
+          if (!existsAlready) {
+            newVars.push(newLine);
+          }
+        });
+        
+        if (newVars.length > 0) {
+          finalContent = existingContent + '\n' + newVars.join('\n');
+        } else {
+          finalContent = existingContent; // No new variables to add
+        }
+      }
+    }
+    
     // Mock file saving - in real implementation, this would write to actual files
     // This will replace existing files or create new ones
     if (storage.saveFile) {
-      storage.saveFile(projectName, fileName, content);
+      storage.saveFile(projectName, fileName, finalContent);
     }
     
     res.json({ success: true, message: "File updated successfully" });
+  });
+
+  // Endpoint specifically for appending environment variables
+  app.post("/api/projects/:projectName/env", (req, res) => {
+    const { projectName } = req.params;
+    const { variables } = req.body; // Array of {key: value} pairs
+    
+    if (!variables || !Array.isArray(variables)) {
+      return res.status(400).json({ error: "Variables array is required" });
+    }
+    
+    const existingContent = storage.getFileContent ? storage.getFileContent(projectName, '.env') : '';
+    const existingLines = existingContent.split('\n').filter(line => line.trim());
+    
+    let newContent = existingContent;
+    const addedVars = [];
+    
+    variables.forEach(({ key, value }) => {
+      const envLine = `${key}=${value}`;
+      const existsAlready = existingLines.some(line => 
+        line.split('=')[0] === key
+      );
+      
+      if (!existsAlready) {
+        newContent = newContent ? newContent + '\n' + envLine : envLine;
+        addedVars.push(key);
+      }
+    });
+    
+    if (storage.saveFile) {
+      storage.saveFile(projectName, '.env', newContent);
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `Environment variables updated: ${addedVars.join(', ')}`,
+      addedVariables: addedVars
+    });
   });
 
   const httpServer = createServer(app);
