@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import ChatInterface from './ChatInterface';
 import FileManager from './FileManager';
 import PreviewPane from './PreviewPane';
-import { FileText, MessageSquare, Settings, Plus, Search } from 'lucide-react';
 
 const MainContent = ({ 
   selectedProject, 
@@ -36,7 +35,7 @@ const MainContent = ({
               )}
             </div>
           </div>
-
+          
           <div className="flex space-x-2">
             <Button
               variant={activeTab === 'chat' ? 'default' : 'ghost'}
@@ -50,8 +49,7 @@ const MainContent = ({
               onClick={() => setActiveTab('files')}
               className="text-sm"
             >
-              <FileText className="w-5 h-5 text-vscode-primary" />
-            Files
+              Files
             </Button>
             <Button
               variant={activeTab === 'preview' ? 'default' : 'ghost'}

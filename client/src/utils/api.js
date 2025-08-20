@@ -7,7 +7,7 @@ export const apiFetch = async (url, options = {}) => {
     'Content-Type': 'application/json',
     ...options.headers,
   };
-
+  
   return fetch(url, {
     ...options,
     headers,
@@ -22,10 +22,10 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-
+  
   // Sessions
   sessions: (projectId) => apiFetch(`${API_BASE}/projects/${projectId}/sessions`),
-
+  
   // GPT-5 API
   gpt5: {
     chat: (data) => apiFetch(`${API_BASE}/gpt5/chat`, {
@@ -45,16 +45,9 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ content }),
   }),
-
+  
   // Cursor API (legacy - keeping for compatibility)
   cursor: {
     sessions: (projectPath) => apiFetch(`${API_BASE}/cursor/sessions?projectPath=${encodeURIComponent(projectPath)}`),
   },
-
-  // Environment variables management
-  createOrUpdateEnvFile: (projectName, envVars) =>
-    apiFetch(`${API_BASE}/projects/${projectName}/env`, {
-      method: 'POST',
-      body: JSON.stringify({ envVars })
-    })
 };
