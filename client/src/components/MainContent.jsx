@@ -3,6 +3,9 @@ import { Button } from '@/components/ui/button';
 import ChatInterface from './ChatInterface';
 import FileManager from './FileManager';
 import PreviewPane from './PreviewPane';
+import Chat from './Chat';
+import QuickSettingsPanel from './QuickSettingsPanel';
+import { FileCode } from 'lucide-react';
 
 const MainContent = ({ 
   selectedProject, 
@@ -35,7 +38,7 @@ const MainContent = ({
               )}
             </div>
           </div>
-          
+
           <div className="flex space-x-2">
             <Button
               variant={activeTab === 'chat' ? 'default' : 'ghost'}
