@@ -38,7 +38,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert coding assistant powered by GPT-5. You're helping with the project "${selectedProject?.displayName || 'Unknown Project'}". 
+            content: `You are an expert coding assistant powered by GPT-4o. You're helping with the project "${selectedProject?.displayName || 'Unknown Project'}". 
             
             Key capabilities:
             - Generate clean, well-documented code
@@ -52,9 +52,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
           ...messages.map(msg => ({ role: msg.role, content: msg.content })),
           { role: 'user', content: input.trim() }
         ],
-        reasoning_effort: 'medium',
-        verbosity: 'medium',
-        max_completion_tokens: 4000
+        max_tokens: 4000
       });
 
       const result = await response.json();
@@ -105,7 +103,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
         >
           <div className="text-sm mb-1">
             <span className="font-semibold">
-              {isUser ? 'You' : 'GPT-5'}
+              {isUser ? 'You' : 'AI Assistant'}
             </span>
             <span className="text-xs opacity-70 ml-2">
               {new Date(message.timestamp).toLocaleTimeString()}
@@ -128,7 +126,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
     <div className="flex flex-col h-full">
       <div className="border-b border-vscode-border p-4">
         <h3 className="text-lg font-semibold text-vscode-text">
-          GPT-5 Chat Assistant
+          AI Chat Assistant
         </h3>
         <p className="text-sm text-vscode-text-muted">
           {selectedProject ? `Working on: ${selectedProject.displayName}` : 'No project selected'}
@@ -138,7 +136,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
       <ScrollArea className="flex-1 p-4">
         {messages.length === 0 ? (
           <div className="text-center text-vscode-text-muted py-8">
-            <h4 className="text-lg font-medium mb-2">Welcome to GPT-5 Chat!</h4>
+            <h4 className="text-lg font-medium mb-2">Welcome to AI Chat!</h4>
             <p className="mb-4">I'm here to help you with coding, debugging, and project development.</p>
             <div className="text-sm text-left max-w-md mx-auto">
               <p className="mb-2">Try asking me:</p>
@@ -157,7 +155,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
               <div className="flex justify-start mb-4">
                 <div className="bg-vscode-surface border border-vscode-border text-vscode-text p-3 rounded-lg">
                   <div className="text-sm mb-1">
-                    <span className="font-semibold">GPT-5</span>
+                    <span className="font-semibold">AI Assistant</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-vscode-primary"></div>
@@ -177,7 +175,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask GPT-5 anything about coding..."
+            placeholder="Ask me anything about coding..."
             className="flex-1 bg-vscode-bg border-vscode-border text-vscode-text"
             disabled={isLoading}
           />

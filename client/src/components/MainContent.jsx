@@ -24,11 +24,11 @@ const MainContent = ({
             </Button>
             <div>
               <h1 className="text-lg font-semibold text-vscode-text">
-                {selectedProject ? selectedProject.displayName || selectedProject.name : 'GPT-5 Code UI'}
+                {selectedProject ? selectedProject.displayName || selectedProject.name : 'AI Code Assistant'}
               </h1>
               {selectedProject && (
                 <p className="text-sm text-vscode-text-muted">
-                  Ready to code with GPT-5 assistance
+                  Ready to code with AI assistance
                 </p>
               )}
             </div>
@@ -58,10 +58,10 @@ const MainContent = ({
         {!selectedProject ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center text-vscode-text-muted max-w-md">
-              <h2 className="text-xl mb-4">Welcome to GPT-5 Code UI</h2>
-              <p className="mb-4">Create a new project or select an existing one to start coding with GPT-5.</p>
+              <h2 className="text-xl mb-4">Welcome to AI Code Assistant</h2>
+              <p className="mb-4">Create a new project or select an existing one to start coding with AI assistance.</p>
               <div className="text-sm">
-                <p className="mb-2">GPT-5 Features:</p>
+                <p className="mb-2">AI Features:</p>
                 <ul className="list-disc list-inside space-y-1 text-left">
                   <li>Advanced code generation and analysis</li>
                   <li>Real-time debugging assistance</li>

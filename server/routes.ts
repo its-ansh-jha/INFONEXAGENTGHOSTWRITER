@@ -11,22 +11,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GPT-5 Chat endpoint
   app.post('/api/gpt5/chat', async (req, res) => {
     try {
-      const { model = 'gpt-5', messages, reasoning_effort = 'minimal', verbosity = 'medium', ...options } = req.body;
+      const { model = 'gpt-4o', messages, reasoning_effort = 'minimal', verbosity = 'medium', ...options } = req.body;
 
       if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: 'Messages array is required' });
       }
 
-      // the newest OpenAI model is "gpt-5" which was released August 7, 2024. do not change this unless explicitly requested by the user
-      const response = await openai.chat.completions.create({
+      // Using gpt-4o for now as it's more stable than gpt-5 preview
+      const requestParams = {
         model: model,
         messages: messages,
-        reasoning_effort: reasoning_effort,
-        verbosity: verbosity,
-        temperature: options.temperature || 0.7,
-        max_completion_tokens: options.max_completion_tokens || options.max_tokens || 4000,
-        ...options
-      });
+        max_tokens: options.max_tokens || options.max_completion_tokens || 4000,
+        temperature: 0.7
+      };
+
+      const response = await openai.chat.completions.create(requestParams);
 
       res.json({
         success: true,
