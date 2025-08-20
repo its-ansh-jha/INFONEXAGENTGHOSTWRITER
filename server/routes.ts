@@ -24,7 +24,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         messages: messages,
         reasoning_effort: reasoning_effort,
         verbosity: verbosity,
-        max_completion_tokens: options.max_completion_tokens || options.max_tokens || 4000
+        max_completion_tokens: options.max_completion_tokens || options.max_tokens || 10000
       };
 
       const response = await openai.chat.completions.create(requestParams);

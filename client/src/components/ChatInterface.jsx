@@ -75,7 +75,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
           ...messages.map(msg => ({ role: msg.role, content: msg.content })),
           { role: 'user', content: input.trim() }
         ],
-        max_tokens: 4000
+        max_tokens: 10000
       });
 
       const result = await response.json();

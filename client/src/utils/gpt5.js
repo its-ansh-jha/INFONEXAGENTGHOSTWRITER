@@ -13,7 +13,7 @@ export class GPT5Client {
       reasoning_effort: options.reasoningEffort || 'minimal',
       verbosity: options.verbosity || 'medium',
       temperature: options.temperature || 0.7,
-      max_completion_tokens: options.maxTokens || 4000,
+      max_completion_tokens: options.maxTokens || 10000,
       ...options
     };
 
