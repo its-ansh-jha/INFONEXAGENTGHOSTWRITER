@@ -9,6 +9,7 @@ The main project is a template/starter application that provides authentication,
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
+Authentication: Removed authentication system as requested by user on 2025-08-20.
 
 # System Architecture
 
@@ -39,10 +40,9 @@ The main project uses Express.js with TypeScript for the backend API server, pro
 - Development-focused setup with Vite integration
 
 ### Authentication System
-- **JWT-based Authentication**: Stateless authentication using JSON Web Tokens
-- **bcrypt Password Hashing**: Secure password storage with salt rounds
-- **Route Protection**: Middleware-based authentication for protected endpoints
-- **Single User System**: Designed for personal use with one administrator account
+- **Removed**: Authentication system was removed as requested by user
+- **Open Access**: Application now runs without login requirements
+- **Direct API Access**: All API endpoints are accessible without authentication
 
 ## Data Storage Solutions
 

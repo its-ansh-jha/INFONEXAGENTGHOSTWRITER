@@ -21,16 +21,9 @@ export function useWebSocket() {
 
   const connect = async () => {
     try {
-      // Get authentication token
-      const token = localStorage.getItem('auth-token');
-      if (!token) {
-        console.warn('No authentication token found for WebSocket connection');
-        return;
-      }
-      
       // Determine WebSocket URL
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
       
       const websocket = new WebSocket(wsUrl);
 

@@ -22,16 +22,12 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
-import MobileNav from './components/MobileNav';
-import ToolsSettings from './components/ToolsSettings';
-import QuickSettingsPanel from './components/QuickSettingsPanel';
+// Note: These components are available but not used in this simplified setup
 
 import { useWebSocket } from './utils/websocket';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { AuthProvider } from './contexts/AuthContext';
-import ProtectedRoute from './components/ProtectedRoute';
 import { useVersionCheck } from './hooks/useVersionCheck';
-import { api, authenticatedFetch } from './utils/api';
+import { api } from './utils/api';
 
 
 // Main App component with routing
@@ -133,17 +129,11 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <Router>
-          <Routes>
-            <Route path="/*" element={
-              <ProtectedRoute>
-                <AppContent />
-              </ProtectedRoute>
-            } />
-          </Routes>
-        </Router>
-      </AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/*" element={<AppContent />} />
+        </Routes>
+      </Router>
     </ThemeProvider>
   );
 }
