@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import ChatInterface from './ChatInterface';
 import FileManager from './FileManager';
 import PreviewPane from './PreviewPane';
-import MonacoEditor from './MonacoEditor';
 
 const MainContent = ({ 
   selectedProject, 
@@ -12,8 +11,6 @@ const MainContent = ({
   setActiveTab, 
   onToggleSidebar 
 }) => {
-  const [showMonacoEditor, setShowMonacoEditor] = useState(false);
-
   return (
     <main className="flex-1 flex flex-col bg-vscode-bg">
       {/* Header */}
@@ -38,7 +35,7 @@ const MainContent = ({
               )}
             </div>
           </div>
-
+          
           <div className="flex space-x-2">
             <Button
               variant={activeTab === 'chat' ? 'default' : 'ghost'}
@@ -60,15 +57,6 @@ const MainContent = ({
               className="text-sm"
             >
               Preview
-            </Button>
-            <Button
-              onClick={() => setShowMonacoEditor(true)}
-              variant="outline"
-              size="sm"
-              className="text-xs bg-vscode-primary text-white hover:bg-vscode-primary/90"
-            >
-              <FileCode className="h-4 w-4 mr-1" />
-              Code Editor
             </Button>
           </div>
         </div>
@@ -109,14 +97,6 @@ const MainContent = ({
           </div>
         ) : null}
       </div>
-
-      {/* Monaco Editor Modal */}
-      {showMonacoEditor && (
-        <MonacoEditor
-          selectedProject={selectedProject}
-          onClose={() => setShowMonacoEditor(false)}
-        />
-      )}
     </main>
   );
 };

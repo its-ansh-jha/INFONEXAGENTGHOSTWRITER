@@ -48,11 +48,10 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
             5. Focus on practical solutions rather than lengthy explanations
             6. When building websites, make them fully functional with inline styles and scripts
             7. IMPORTANT: When user asks to "edit" or "modify" or "update" a website/file, always provide the COMPLETE updated file content using CREATE_FILE format - this will replace the existing file
-            8. If the website needs environment variables to run, create a .env file with placeholder values like OPENAIAPIKEY=YOUR_API_KEY and instruct the user to replace YOUR_API_KEY. If another env var is needed later, append to the existing .env file like GOOGLE_API_KEY=YOUR_API_KEY
-
+            
             Example: If user asks for a website, respond with:
             "I'll create a complete website for you.
-
+            
             CREATE_FILE: index.html
             \`\`\`
             <!DOCTYPE html>
@@ -66,11 +65,11 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
             </body>
             </html>
             \`\`\`
-
+            
             The website includes [brief description of features]."
-
+            
             When editing existing files, always provide the FULL updated code using the same CREATE_FILE format.
-
+            
             Provide helpful guidance while keeping responses compact and actionable.`
           },
           ...messages.map(msg => ({ role: msg.role, content: msg.content })),
@@ -80,17 +79,17 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
       });
 
       const result = await response.json();
-
+      
       if (result.success && result.data.choices?.[0]?.message) {
         const content = result.data.choices[0].message.content;
-
+        
         // Check if the AI wants to create a file
         const fileMatch = content.match(/CREATE_FILE:\s*(\S+)\s*```([\s\S]*?)```/);
         if (fileMatch && selectedProject) {
           const [, fileName, fileContent] = fileMatch;
           try {
             await api.saveFile(selectedProject.name, fileName, fileContent.trim());
-
+            
             // Show only a simple success message without the code
             const assistantMessage = {
               id: Date.now() + 1,
@@ -114,65 +113,15 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
             setMessages(prev => [...prev, assistantMessage]);
           }
         } else {
-          // Check if the AI wants to create/update a .env file
-          const envMatch = content.match(/CREATE_FILE:\s*(\.env(?:\.\w+)?)\s*```([\s\S]*?)```/);
-          if (envMatch && selectedProject) {
-            const [, envFileName, envFileContent] = envMatch;
-            const envFilePath = envFileName;
-            const envFileContentTrimmed = envFileContent.trim();
-
-            try {
-              // Check if the .env file already exists
-              const existingFile = await api.getFileContent(selectedProject.name, envFilePath);
-              if (existingFile && existingFile.content) {
-                // Append new content if file exists
-                const newContent = existingFile.content + '\n' + envFileContentTrimmed;
-                await api.saveFile(selectedProject.name, envFilePath, newContent);
-                const assistantMessage = {
-                  id: Date.now() + 1,
-                  role: 'assistant',
-                  content: `✅ I've appended new environment variables to "${envFileName}". Please review the file.`,
-                  timestamp: new Date().toISOString(),
-                  usage: result.usage,
-                  fileCreated: envFileName
-                };
-                setMessages(prev => [...prev, assistantMessage]);
-              } else {
-                // Create the .env file if it doesn't exist
-                await api.saveFile(selectedProject.name, envFilePath, envFileContentTrimmed);
-                const assistantMessage = {
-                  id: Date.now() + 1,
-                  role: 'assistant',
-                  content: `✅ I've created "${envFileName}" with your environment variables. Please replace 'YOUR_API_KEY' or similar placeholders with your actual keys.`,
-                  timestamp: new Date().toISOString(),
-                  usage: result.usage,
-                  fileCreated: envFileName
-                };
-                setMessages(prev => [...prev, assistantMessage]);
-              }
-            } catch (error) {
-              console.error('Error handling .env file:', error);
-              const assistantMessage = {
-                id: Date.now() + 1,
-                role: 'assistant',
-                content: `❌ I couldn't manage the "${envFileName}" file automatically. Please try again or create/edit it manually.`,
-                timestamp: new Date().toISOString(),
-                usage: result.usage,
-                isError: true
-              };
-              setMessages(prev => [...prev, assistantMessage]);
-            }
-          } else {
-            // Display the full AI response content if not a file creation or .env update
-            const assistantMessage = {
-              id: Date.now() + 1,
-              role: 'assistant',
-              content: content || 'No response content received',
-              timestamp: new Date().toISOString(),
-              usage: result.usage
-            };
-            setMessages(prev => [...prev, assistantMessage]);
-          }
+          // Display the full AI response content
+          const assistantMessage = {
+            id: Date.now() + 1,
+            role: 'assistant',
+            content: content || 'No response content received',
+            timestamp: new Date().toISOString(),
+            usage: result.usage
+          };
+          setMessages(prev => [...prev, assistantMessage]);
         }
       } else {
         throw new Error('No valid response received from AI');
@@ -194,7 +143,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
 
   const renderMessage = (message) => {
     const isUser = message.role === 'user';
-
+    
     return (
       <div
         key={message.id}
@@ -259,7 +208,6 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
                 <li>"Make a todo app"</li>
                 <li>"Edit the website to add a contact form"</li>
                 <li>"Update the homepage with a dark theme"</li>
-                <li>"Create a .env file with OPENAIAPIKEY"</li>
               </ul>
             </div>
           </div>
