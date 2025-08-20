@@ -54,7 +54,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
         ],
         reasoning_effort: 'medium',
         verbosity: 'medium',
-        max_tokens: 4000
+        max_completion_tokens: 4000
       });
 
       const result = await response.json();

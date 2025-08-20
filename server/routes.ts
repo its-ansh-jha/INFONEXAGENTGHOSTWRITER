@@ -24,7 +24,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         reasoning_effort: reasoning_effort,
         verbosity: verbosity,
         temperature: options.temperature || 0.7,
-        max_tokens: options.max_tokens || 4000,
+        max_completion_tokens: options.max_completion_tokens || options.max_tokens || 4000,
         ...options
       });
 
