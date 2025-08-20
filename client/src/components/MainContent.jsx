@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import ChatInterface from './ChatInterface';
 import FileManager from './FileManager';
 import PreviewPane from './PreviewPane';
-import MonacoEditor from './MonacoEditor';
 
 const MainContent = ({ 
   selectedProject, 

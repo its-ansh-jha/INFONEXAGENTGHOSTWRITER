@@ -24,7 +24,7 @@ router.post('/chat', async (req, res) => {
       messages: messages,
       reasoning_effort: reasoning_effort,
       verbosity: verbosity,
-      max_completion_tokens: options.max_completion_tokens || options.max_tokens || 10000,
+      max_completion_tokens: options.max_completion_tokens || options.max_tokens || 4000,
       ...options
     });
 
@@ -84,7 +84,7 @@ router.post('/generate-code', async (req, res) => {
       messages: [systemMessage, userMessage],
       reasoning_effort: 'medium',
       verbosity: 'high',
-      max_completion_tokens: 10000,
+      max_completion_tokens: 4000,
       ...options
     });
 
