@@ -22,7 +22,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
-// Note: These components are available but not used in this simplified setup
+import NewProjectDialog from './components/NewProjectDialog';
 
 import { useWebSocket } from './utils/websocket';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -64,6 +64,7 @@ function AppContent() {
     const saved = localStorage.getItem('sendByCtrlEnter');
     return saved !== null ? JSON.parse(saved) : false;
   });
+  const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   // Session Protection System: Track sessions with active conversations to prevent
   // automatic project updates from interrupting ongoing chats. When a user sends
   // a message, the session is marked as "active" and project updates are paused
@@ -102,6 +103,23 @@ function AppContent() {
     }
   };
 
+  const handleCreateProject = async (projectData) => {
+    try {
+      const response = await api.createProject(projectData);
+      const result = await response.json();
+      
+      if (result.success) {
+        // Refresh projects list
+        await fetchProjects();
+        // Select the new project
+        setSelectedProject(result.project);
+      }
+    } catch (error) {
+      console.error('Error creating project:', error);
+      throw error;
+    }
+  };
+
   return (
     <div className="bg-vscode-bg text-vscode-text font-sans h-screen overflow-hidden">
       <div className="flex h-full">
@@ -111,8 +129,14 @@ function AppContent() {
           selectedSession={selectedSession}
           onProjectSelect={setSelectedProject}
           onSessionSelect={setSelectedSession}
+          onNewProject={() => setShowNewProjectDialog(true)}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+        />
+        <NewProjectDialog 
+          isOpen={showNewProjectDialog}
+          onClose={() => setShowNewProjectDialog(false)}
+          onCreateProject={handleCreateProject}
         />
         <MainContent 
           selectedProject={selectedProject}

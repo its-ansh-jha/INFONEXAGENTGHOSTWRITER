@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import ChatInterface from './ChatInterface';
 
 const MainContent = ({ 
   selectedProject, 
@@ -23,11 +24,11 @@ const MainContent = ({
             </Button>
             <div>
               <h1 className="text-lg font-semibold text-vscode-text">
-                {selectedProject ? selectedProject.displayName || selectedProject.name : 'Select a Project'}
+                {selectedProject ? selectedProject.displayName || selectedProject.name : 'GPT-5 Code UI'}
               </h1>
-              {selectedSession && (
+              {selectedProject && (
                 <p className="text-sm text-vscode-text-muted">
-                  Session: {selectedSession.title || selectedSession.id}
+                  Ready to code with GPT-5 assistance
                 </p>
               )}
             </div>
@@ -53,33 +54,37 @@ const MainContent = ({
       </header>
 
       {/* Content */}
-      <div className="flex-1 p-6">
+      <div className="flex-1 flex flex-col">
         {!selectedProject ? (
-          <div className="text-center text-vscode-text-muted">
-            <h2 className="text-xl mb-2">Welcome to Claude Code UI</h2>
-            <p>Select a project from the sidebar to get started.</p>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center text-vscode-text-muted max-w-md">
+              <h2 className="text-xl mb-4">Welcome to GPT-5 Code UI</h2>
+              <p className="mb-4">Create a new project or select an existing one to start coding with GPT-5.</p>
+              <div className="text-sm">
+                <p className="mb-2">GPT-5 Features:</p>
+                <ul className="list-disc list-inside space-y-1 text-left">
+                  <li>Advanced code generation and analysis</li>
+                  <li>Real-time debugging assistance</li>
+                  <li>Project architecture guidance</li>
+                  <li>Best practices recommendations</li>
+                </ul>
+              </div>
+            </div>
           </div>
         ) : activeTab === 'chat' ? (
-          <div className="bg-vscode-surface rounded-lg p-6 h-full">
-            <h3 className="text-lg font-semibold text-vscode-text mb-4">Chat Interface</h3>
-            {selectedSession ? (
-              <div className="text-vscode-text">
-                <p>Chat session: {selectedSession.title || selectedSession.id}</p>
-                <p className="text-sm text-vscode-text-muted mt-2">
-                  Chat functionality will be implemented here.
-                </p>
-              </div>
-            ) : (
-              <div className="text-vscode-text-muted">
-                Select a session or start a new conversation.
-              </div>
-            )}
+          <div className="flex-1 bg-vscode-surface">
+            <ChatInterface 
+              selectedProject={selectedProject}
+              selectedSession={selectedSession}
+            />
           </div>
         ) : (
-          <div className="bg-vscode-surface rounded-lg p-6 h-full">
-            <h3 className="text-lg font-semibold text-vscode-text mb-4">Project Files</h3>
-            <div className="text-vscode-text-muted">
-              File explorer will be implemented here.
+          <div className="flex-1 p-6">
+            <div className="bg-vscode-surface rounded-lg p-6 h-full">
+              <h3 className="text-lg font-semibold text-vscode-text mb-4">Project Files</h3>
+              <div className="text-vscode-text-muted">
+                File explorer will be implemented here.
+              </div>
             </div>
           </div>
         )}

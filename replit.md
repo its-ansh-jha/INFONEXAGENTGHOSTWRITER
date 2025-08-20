@@ -2,9 +2,9 @@
 
 This repository contains two distinct applications: a modern web-based UI for Claude Code CLI and Cursor CLI (located in `claudecodeui/`), and a full-stack REST API application built with Express.js backend and React frontend (main project). Both applications serve different purposes and use different architectural approaches.
 
-The Claude Code UI is a comprehensive desktop and mobile interface that allows users to interact with Claude Code and Cursor CLI tools through a web browser. It provides features like interactive chat, file exploration, git integration, session management, and PWA capabilities.
+The GPT-5 Code UI is a comprehensive web interface that allows users to interact with OpenAI's GPT-5 model for code development and analysis. It provides features like interactive chat with GPT-5, project management, code generation, and development assistance through an intuitive web browser interface.
 
-The main project is a template/starter application that provides authentication, user management, and basic CRUD operations using modern web technologies.
+This application was transformed from a Claude Code UI template to integrate with GPT-5, offering advanced AI-powered coding assistance with state-of-the-art language model capabilities.
 
 # User Preferences
 
@@ -63,11 +63,11 @@ The main project includes a memory storage implementation for development/testin
 
 ## External Dependencies
 
-### Claude Code CLI Integration
-- **Process Spawning**: Direct integration with Claude CLI using `child_process.spawn`
-- **Session Management**: Tracking and resuming Claude conversations
-- **Project Discovery**: Automatic detection of Claude projects from `~/.claude/projects/`
-- **WebSocket Communication**: Real-time communication between frontend and CLI processes
+### GPT-5 Integration
+- **OpenAI API Integration**: Direct integration with OpenAI's GPT-5 model via REST API
+- **Advanced Code Generation**: State-of-the-art code generation with reasoning capabilities
+- **Interactive Chat**: Real-time chat interface with GPT-5 for coding assistance
+- **Project Context Awareness**: GPT-5 understands project context for better assistance
 
 ### Cursor CLI Integration  
 - **MD5 Project Hashing**: Project identification using MD5 hashes of project paths

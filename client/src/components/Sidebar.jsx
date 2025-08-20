@@ -8,6 +8,7 @@ const Sidebar = ({
   selectedSession, 
   onProjectSelect, 
   onSessionSelect, 
+  onNewProject,
   isOpen, 
   onClose 
 }) => {
@@ -34,9 +35,28 @@ const Sidebar = ({
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
           <div>
-            <h3 className="text-sm font-medium text-vscode-text-muted mb-2">Projects</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-vscode-text-muted">Projects</h3>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={onNewProject}
+                className="text-vscode-primary hover:bg-vscode-hover text-xs"
+                title="Create New Project"
+              >
+                + New
+              </Button>
+            </div>
             {projects.length === 0 ? (
-              <p className="text-sm text-vscode-text-muted">No projects found</p>
+              <div className="text-center py-6">
+                <p className="text-sm text-vscode-text-muted mb-3">No projects found</p>
+                <Button 
+                  onClick={onNewProject}
+                  className="bg-vscode-primary text-white hover:bg-vscode-primary/90 text-sm"
+                >
+                  Create Your First Project
+                </Button>
+              </div>
             ) : (
               <div className="space-y-2">
                 {projects.map((project, index) => (
