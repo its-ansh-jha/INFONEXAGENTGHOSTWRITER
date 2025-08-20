@@ -86,13 +86,12 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
           const [, fileName, fileContent] = fileMatch;
           try {
             await api.saveFile(selectedProject.name, fileName, fileContent.trim());
-            // Replace the create file command with a success message
-            const cleanContent = content.replace(/CREATE_FILE:[\s\S]*?```/, `I've created the file "${fileName}" for you. You can view and edit it in the Files tab, or see the preview in the Preview tab if it's an HTML file.`);
             
+            // Show only a simple success message without the code
             const assistantMessage = {
               id: Date.now() + 1,
               role: 'assistant',
-              content: cleanContent,
+              content: `✅ I've successfully created "${fileName}" for you! You can view and edit it in the Files tab, or see the preview in the Preview tab if it's an HTML file.`,
               timestamp: new Date().toISOString(),
               usage: result.usage,
               fileCreated: fileName
@@ -103,7 +102,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
             const assistantMessage = {
               id: Date.now() + 1,
               role: 'assistant',
-              content: content + `\n\nNote: I couldn't save the file automatically. You can copy the code above and save it manually in the Files tab.`,
+              content: `❌ I couldn't save the file "${fileName}" automatically. Please try again or create it manually in the Files tab.`,
               timestamp: new Date().toISOString(),
               usage: result.usage,
               isError: true
@@ -111,17 +110,18 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
             setMessages(prev => [...prev, assistantMessage]);
           }
         } else {
+          // Display the full AI response content
           const assistantMessage = {
             id: Date.now() + 1,
             role: 'assistant',
-            content: content,
+            content: content || 'No response content received',
             timestamp: new Date().toISOString(),
             usage: result.usage
           };
           setMessages(prev => [...prev, assistantMessage]);
         }
       } else {
-        throw new Error('Invalid response from AI');
+        throw new Error('No valid response received from AI');
       }
     } catch (error) {
       console.error('Chat error:', error);
