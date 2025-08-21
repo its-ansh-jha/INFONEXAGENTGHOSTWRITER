@@ -46,22 +46,5 @@ export const insertMessageSchema = createInsertSchema(messages).omit({
 
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type Conversation = typeof conversations.$inferSelect;
-export const projects = pgTable("projects", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull().unique(),
-  displayName: text("display_name"),
-  path: text("path").notNull(),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
-
-export const insertProjectSchema = createInsertSchema(projects).pick({
-  name: true,
-  displayName: true,
-  path: true,
-});
-
-export type InsertProject = z.infer<typeof insertProjectSchema>;
-export type Project = typeof projects.$inferSelect;
-
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messages.$inferSelect;

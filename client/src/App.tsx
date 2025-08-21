@@ -1,7 +1,25 @@
+/*
+ * App.jsx - Main Application Component with Session Protection System
+ * 
+ * SESSION PROTECTION SYSTEM OVERVIEW:
+ * ===================================
+ * 
+ * Problem: Automatic project updates from WebSocket would refresh the sidebar and clear chat messages
+ * during active conversations, creating a poor user experience.
+ * 
+ * Solution: Track "active sessions" and pause project updates during conversations.
+ * 
+ * How it works:
+ * 1. When user sends message → session marked as "active" 
+ * 2. Project updates are skipped while session is active
+ * 3. When conversation completes/aborts → session marked as "inactive"
+ * 4. Project updates resume normally
+ * 
+ * Handles both existing sessions (with real IDs) and new sessions (with temporary IDs).
+ */
 
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import NewProjectDialog from './components/NewProjectDialog';
@@ -11,8 +29,6 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { api } from './utils/api';
 
-// Create a query client
-const queryClient = new QueryClient();
 
 // Main App component with routing
 function AppContent() {
@@ -22,15 +38,15 @@ function AppContent() {
   const { updateAvailable, latestVersion, currentVersion } = useVersionCheck('siteboon', 'claudecodeui');
   const [showVersionModal, setShowVersionModal] = useState(false);
 
-  const [projects, setProjects] = useState([]); // Initialize as empty array
+  const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
   const [activeTab, setActiveTab] = useState('chat'); // 'chat' or 'files'
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
-  const [isLoadingConversations, setIsLoadingConversations] = useState(true);
-  const [conversations, setConversations] = useState([]);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(true); // State for loading conversations
+  const [conversations, setConversations] = useState([]); // State for conversations
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [showToolsSettings, setShowToolsSettings] = useState(false);
   const [showQuickSettings, setShowQuickSettings] = useState(false);
@@ -44,14 +60,18 @@ function AppContent() {
   });
   const [autoScrollToBottom, setAutoScrollToBottom] = useState(() => {
     const saved = localStorage.getItem('autoScrollToBottom');
-    return saved !== null ? JSON.parse(saved) : true;
+    return saved !== null ? JSON.JSON.parse(saved) : true;
   });
   const [sendByCtrlEnter, setSendByCtrlEnter] = useState(() => {
     const saved = localStorage.getItem('sendByCtrlEnter');
     return saved !== null ? JSON.parse(saved) : false;
   });
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
-  const [activeSessions, setActiveSessions] = useState(new Set());
+  // Session Protection System: Track sessions with active conversations to prevent
+  // automatic project updates from interrupting ongoing chats. When a user sends
+  // a message, the session is marked as "active" and project updates are paused
+  // until the conversation completes or is aborted.
+  const [activeSessions, setActiveSessions] = useState(new Set()); // Track sessions with active conversations
 
   const { ws, sendMessage, messages } = useWebSocket();
 
@@ -89,7 +109,6 @@ function AppContent() {
       setProjects(data || []);
     } catch (error) {
       console.error('Error fetching projects:', error);
-      setProjects([]); // Ensure projects is always an array
     } finally {
       setIsLoadingProjects(false);
     }
@@ -105,7 +124,6 @@ function AppContent() {
       setConversations(data.conversations || []);
     } catch (error) {
       console.error('Error fetching conversations:', error);
-      setConversations([]); // Ensure conversations is always an array
     } finally {
       setIsLoadingConversations(false);
     }
@@ -140,7 +158,6 @@ function AppContent() {
           onNewProject={() => setShowNewProjectDialog(true)}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
-          fetchProjects={fetchProjects}
         />
         <NewProjectDialog 
           isOpen={showNewProjectDialog}
@@ -153,8 +170,8 @@ function AppContent() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          conversations={conversations}
-          isLoadingConversations={isLoadingConversations}
+          conversations={conversations} // Pass conversations to MainContent
+          isLoadingConversations={isLoadingConversations} // Pass loading state
         />
       </div>
     </div>
@@ -163,15 +180,13 @@ function AppContent() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <Router>
-          <Routes>
-            <Route path="/*" element={<AppContent />} />
-          </Routes>
-        </Router>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <Router>
+        <Routes>
+          <Route path="/*" element={<AppContent />} />
+        </Routes>
+      </Router>
+    </ThemeProvider>
   );
 }
 

@@ -1,15 +1,15 @@
 // Utility function for authenticated API calls
 export const authenticatedFetch = (url: string, options: RequestInit = {}) => {
   const token = localStorage.getItem('auth-token');
-
+  
   const defaultHeaders: HeadersInit = {
     'Content-Type': 'application/json',
   };
-
+  
   if (token) {
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
-
+  
   return fetch(url, {
     ...options,
     headers: {
@@ -37,7 +37,7 @@ export const api = {
     user: () => authenticatedFetch('/api/auth/user'),
     logout: () => authenticatedFetch('/api/auth/logout', { method: 'POST' }),
   },
-
+  
   // Protected endpoints
   config: () => authenticatedFetch('/api/config'),
   projects: () => authenticatedFetch('/api/projects'),
@@ -86,7 +86,7 @@ export const api = {
       body: formData,
       headers: {}, // Let browser set Content-Type for FormData
     }),
-
+    
   // Chat/GPT-5 endpoints
   gpt5: {
     chat: (data: any) => fetch('/api/gpt5/chat', {
@@ -95,7 +95,7 @@ export const api = {
       body: JSON.stringify(data),
     }),
   },
-
+  
   // Conversation endpoints
   conversations: {
     getAll: () => fetch('/api/conversations'),
@@ -121,29 +121,4 @@ export const api = {
         body: JSON.stringify(message),
       }),
   },
-};
-
-export const fetchProjects = async (): Promise<Project[]> => {
-  const response = await fetch('/api/projects');
-  if (!response.ok) {
-    throw new Error('Failed to fetch projects');
-  }
-  return response.json();
-};
-
-export const createFile = async (projectId: string, path: string, content: string) => {
-  const response = await fetch('/api/files', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ projectId, path, content }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to create file');
-  }
-
-  return response.json();
 };

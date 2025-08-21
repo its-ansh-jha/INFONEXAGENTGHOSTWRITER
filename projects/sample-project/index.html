@@ -1,114 +1,378 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat UI App</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .chat-container {
-            width: 90%;
-            max-width: 400px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            border-radius: 8px;
-            overflow: hidden;
-            background-color: #fff;
-        }
-        .chat-header {
-            background-color: #6200ea;
-            color: #fff;
-            padding: 15px;
-            text-align: center;
-            font-size: 18px;
-        }
-        .chat-messages {
-            height: 300px;
-            overflow-y: auto;
-            padding: 10px;
-            background-color: #e0e0e0;
-        }
-        .message {
-            display: flex;
-            margin-bottom: 10px;
-        }
-        .message.sent {
-            justify-content: flex-end;
-        }
-        .message.received {
-            justify-content: flex-start;
-        }
-        .message .text {
-            max-width: 60%;
-            padding: 10px;
-            border-radius: 5px;
-            background-color: #6200ea;
-            color: white;
-        }
-        .message.received .text {
-            background-color: #ccc;
-            color: black;
-        }
-        .chat-input {
-            display: flex;
-            border-top: 1px solid #ccc;
-        }
-        .chat-input input {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            outline: none;
-        }
-        .chat-input button {
-            background-color: #6200ea;
-            color: white;
-            border: none;
-            padding: 0 15px;
-            cursor: pointer;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Portfolio</title>
+  <style>
+    :root {
+      --bg: #0f1221;
+      --card: #171a2b;
+      --text: #eef2ff;
+      --muted: #aab0d6;
+      --accent: #6c8bff;
+      --accent-2: #7ef0c5;
+      --warning: #ffcc66;
+      --border: #242845;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 14px;
+    }
+    * { box-sizing: border-box }
+    html, body { margin:0; padding:0; background:var(--bg); color:var(--text); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+    a { color: inherit; text-decoration: none }
+    img { max-width:100%; display:block }
+
+    header {
+      position: sticky; top:0; z-index: 100;
+      backdrop-filter: blur(8px);
+      background: linear-gradient(180deg, rgba(15,18,33,.8), rgba(15,18,33,.3) 60%, rgba(15,18,33,0));
+      border-bottom: 1px solid var(--border);
+    }
+    .nav {
+      max-width: 1100px; margin:0 auto; padding:12px 18px;
+      display:flex; align-items:center; justify-content:space-between; gap:16px;
+    }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.3px }
+    .logo {
+      width:32px; height:32px; border-radius:9px;
+      background: conic-gradient(from 210deg, var(--accent), var(--accent-2));
+      box-shadow: inset 0 0 10px rgba(255,255,255,.25), 0 6px 16px rgba(108,139,255,.35);
+    }
+    .nav a { color: var(--muted); padding:8px 10px; border-radius:10px }
+    .nav a:hover, .nav a.active { color: var(--text); background: rgba(255,255,255,.06) }
+
+    .container { max-width:1100px; margin:0 auto; padding:32px 18px }
+
+    .hero {
+      display:grid; grid-template-columns: 1.2fr .8fr; gap:28px; align-items:center; padding:42px 0 22px;
+    }
+    .hero h1 { font-size: clamp(32px, 4vw, 48px); line-height:1.1; margin:0 0 12px }
+    .hero p { color: var(--muted); margin:0 0 20px; font-size: clamp(15px, 2vw, 18px) }
+    .cta { display:flex; gap:12px; flex-wrap:wrap }
+    .btn {
+      display:inline-flex; align-items:center; gap:8px; padding:12px 16px; border-radius:12px; border:1px solid var(--border);
+      background: linear-gradient(180deg, #1b1f35, #14182a); color:var(--text); cursor:pointer; box-shadow: var(--shadow);
+    }
+    .btn.primary { background: linear-gradient(180deg, #6c8bff, #4f66d9); border-color: #5f79ef; color: #0b1130; font-weight:700 }
+    .btn:hover { transform: translateY(-1px); transition: .2s ease; filter: brightness(1.05) }
+
+    .card {
+      background: linear-gradient(180deg, #14182a, #101324); border:1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+    }
+    .avatar-wrap {
+      position:relative; aspect-ratio: 1/1; border-radius: 18px; overflow:hidden; border:1px solid var(--border);
+      background: radial-gradient(120% 120% at 0% 0%, rgba(124,152,255,.25), transparent 40%),
+                  radial-gradient(120% 120% at 100% 100%, rgba(126,240,197,.18), transparent 40%),
+                  #0e1226;
+    }
+    .avatar {
+      position:absolute; inset:0; display:grid; place-items:center; font-size:56px; color:#0b1130;
+      text-shadow: 0 2px 0 rgba(255,255,255,.25);
+    }
+
+    .section-title { font-size:24px; margin:8px 0 16px }
+    .grid { display:grid; gap:16px }
+    .grid.projects { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) }
+    .grid.about { grid-template-columns: 1fr 1fr }
+    .pill {
+      display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius:999px; background: rgba(255,255,255,.06); border:1px solid var(--border); color:var(--muted); font-size:13px
+    }
+    .skills { display:flex; flex-wrap:wrap; gap:8px }
+    .project { padding:14px; display:flex; flex-direction:column; gap:12px }
+    .project h3 { margin:0; font-size:18px }
+    .project p { margin:0; color:var(--muted); font-size:14px }
+    .badges { display:flex; gap:8px; flex-wrap:wrap }
+    .project .thumb {
+      border-radius:10px; overflow:hidden; border:1px solid var(--border);
+      aspect-ratio: 16/9; background: linear-gradient(135deg, #1a1f38, #0d1124);
+      position:relative;
+    }
+    .thumb canvas, .thumb .fallback { position:absolute; inset:0; width:100%; height:100% }
+    .thumb .fallback { display:grid; place-items:center; color:var(--muted); font-size:13px }
+
+    .resume { display:grid; grid-template-columns: 1.1fr .9fr; gap:16px }
+    .timeline { display:grid; gap:12px }
+    .item { padding:14px; }
+    .item h4 { margin:0 0 6px; font-size:16px }
+    .item small { color:var(--muted) }
+    .item p { margin:8px 0 0; color:var(--muted); font-size:14px }
+
+    .contact { display:grid; grid-template-columns: 1fr .9fr; gap:16px }
+    form { display:grid; gap:10px }
+    input, textarea {
+      background:#0c1124; color:var(--text); border:1px solid var(--border); padding:10px 12px; border-radius:10px; outline: none;
+    }
+    textarea { min-height:110px; resize:vertical }
+    .note { color: var(--muted); font-size:13px }
+
+    footer { text-align:center; color:var(--muted); padding:24px 0 36px }
+    .social { display:flex; gap:10px; justify-content:center; margin-top:10px }
+    .social a { padding:8px 10px; border:1px solid var(--border); border-radius:10px; background: rgba(255,255,255,.06) }
+    .badge-bar { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px }
+    .status { color: var(--warning); font-weight:600 }
+
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; }
+      .grid.about, .resume, .contact { grid-template-columns: 1fr }
+    }
+  </style>
 </head>
 <body>
-    <div class="chat-container">
-        <div class="chat-header">Chat UI</div>
-        <div class="chat-messages" id="chat-messages">
-            <div class="message sent">
-                <div class="text">Hello!</div>
-            </div>
-            <div class="message received">
-                <div class="text">Hi there!</div>
-            </div>
-        </div>
-        <div class="chat-input">
-            <input type="text" id="chat-input" placeholder="Type a message...">
-            <button onclick="sendMessage()">Send</button>
-        </div>
-    </div>
+  <header>
+    <nav class="nav">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <span>Your Name</span>
+      </div>
+      <div>
+        <a href="#about" class="active">About</a>
+        <a href="#projects">Projects</a>
+        <a href="#resume">Resume</a>
+        <a href="#contact">Contact</a>
+      </div>
+    </nav>
+  </header>
 
-    <script>
-        function sendMessage() {
-            var input = document.getElementById('chat-input');
-            var messages = document.getElementById('chat-messages');
-            if (input.value.trim() !== '') {
-                var message = document.createElement('div');
-                message.className = 'message sent';
-                var text = document.createElement('div');
-                text.className = 'text';
-                text.textContent = input.value;
-                message.appendChild(text);
-                messages.appendChild(message);
-                input.value = '';
-                messages.scrollTop = messages.scrollHeight;
-            }
+  <main class="container">
+    <section class="hero">
+      <div>
+        <div class="badge-bar">
+          <span class="pill">Open to opportunities</span>
+          <span class="pill">Remote / Hybrid</span>
+          <span class="pill">Freelance</span>
+        </div>
+        <h1>Designer & Developer crafting delightful web experiences</h1>
+        <p>I build fast, accessible, and maintainable products. Specialized in React, TypeScript, and Node—focused on clean UI and pragmatic DX.</p>
+        <div class="cta">
+          <a class="btn primary" href="#contact">Get in touch</a>
+          <a class="btn" href="#projects">View projects</a>
+          <a class="btn" href="#" id="downloadCV">Download CV</a>
+        </div>
+        <div class="badge-bar">
+          <span class="pill">Currently: <span class="status">Building Sample Project</span></span>
+          <span class="pill">Response time: <strong>~24h</strong></span>
+        </div>
+      </div>
+      <div class="avatar-wrap card">
+        <div class="avatar">🧑‍💻</div>
+      </div>
+    </section>
+
+    <section id="about">
+      <h2 class="section-title">About</h2>
+      <div class="grid about">
+        <div class="card item">
+          <h4>Who I am</h4>
+          <p>Full-stack engineer with a design mindset. I love turning complex problems into simple, beautiful, and intuitive solutions.</p>
+          <div class="skills" style="margin-top:10px">
+            <span class="pill">JavaScript</span>
+            <span class="pill">TypeScript</span>
+            <span class="pill">React</span>
+            <span class="pill">Next.js</span>
+            <span class="pill">Node.js</span>
+            <span class="pill">GraphQL</span>
+          </div>
+        </div>
+        <div class="card item">
+          <h4>What I value</h4>
+          <p>Performance, accessibility, and maintainability. I care about developer experience and great documentation.</p>
+          <div class="skills" style="margin-top:10px">
+            <span class="pill">A11y</span>
+            <span class="pill">Perf</span>
+            <span class="pill">Testing</span>
+            <span class="pill">CI/CD</span>
+            <span class="pill">UX Writing</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="projects" style="margin-top:26px">
+      <h2 class="section-title">Projects</h2>
+      <div class="grid projects">
+        <article class="project card">
+          <div class="thumb"><canvas data-title="Analytics Dashboard"></canvas><div class="fallback">Dashboard Preview</div></div>
+          <h3>Analytics Dashboard</h3>
+          <p>Feature-rich dashboard with real-time charts, role-based access, and offline support.</p>
+          <div class="badges">
+            <span class="pill">React</span><span class="pill">TypeScript</span><span class="pill">WebSockets</span>
+          </div>
+          <div class="cta">
+            <a class="btn" href="#" data-demo>Live demo</a>
+            <a class="btn" href="#" data-code>Source</a>
+          </div>
+        </article>
+
+        <article class="project card">
+          <div class="thumb"><canvas data-title="E-commerce Starter"></canvas><div class="fallback">Storefront Preview</div></div>
+          <h3>E‑commerce Starter</h3>
+          <p>Headless storefront with checkout, product search, and CMS integration.</p>
+          <div class="badges">
+            <span class="pill">Next.js</span><span class="pill">Stripe</span><span class="pill">Prisma</span>
+          </div>
+          <div class="cta">
+            <a class="btn" href="#" data-demo>Live demo</a>
+            <a class="btn" href="#" data-code>Source</a>
+          </div>
+        </article>
+
+        <article class="project card">
+          <div class="thumb"><canvas data-title="Design System"></canvas><div class="fallback">Components Preview</div></div>
+          <h3>Design System</h3>
+          <p>Accessible component library with tokens, theming, and docs site.</p>
+          <div class="badges">
+            <span class="pill">Storybook</span><span class="pill">Rollup</span><span class="pill">A11y</span>
+          </div>
+          <div class="cta">
+            <a class="btn" href="#" data-demo>Docs</a>
+            <a class="btn" href="#" data-code>Repo</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="resume" style="margin-top:26px">
+      <h2 class="section-title">Resume</h2>
+      <div class="resume">
+        <div class="timeline">
+          <div class="card item">
+            <h4>Senior Frontend Engineer • Acme Corp</h4>
+            <small>2022 — Present · Remote</small>
+            <p>Led UI architecture for a multi-tenant platform; improved LCP by 38% and cut bundle by 27%.</p>
+          </div>
+          <div class="card item">
+            <h4>Full‑stack Developer • Beta Labs</h4>
+            <small>2020 — 2022 · NYC</small>
+            <p>Built internal tooling; automated workflows saved ~12 hrs/week across teams.</p>
+          </div>
+          <div class="card item">
+            <h4>B.S. Computer Science</h4>
+            <small>University Name</small>
+            <p>Focus in HCI and distributed systems. TA for Web Development.</p>
+          </div>
+        </div>
+        <div class="card item">
+          <h4>Highlights</h4>
+          <ul>
+            - OSS contributor (React ecosystem)
+            - Speaker at local meetups
+            - Mentored 6 junior devs
+          </ul>
+          <div class="skills" style="margin-top:10px">
+            <span class="pill">React</span><span class="pill">TypeScript</span><span class="pill">Node</span><span class="pill">Postgres</span><span class="pill">Docker</span><span class="pill">AWS</span>
+          </div>
+          <div class="badge-bar">
+            <a class="btn" href="#" id="viewResume">View PDF</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact" style="margin-top:26px">
+      <h2 class="section-title">Contact</h2>
+      <div class="contact">
+        <div class="card item">
+          <h4>Let’s build something</h4>
+          <p class="note">Email me at <a href="mailto:you@example.com">you@example.com</a> or use the form. I usually reply within 24 hours.</p>
+          <div class="social">
+            <a href="https://github.com/" target="_blank" rel="noopener">GitHub</a>
+            <a href="https://www.linkedin.com/" target="_blank" rel="noopener">LinkedIn</a>
+            <a href="https://twitter.com/" target="_blank" rel="noopener">Twitter</a>
+          </div>
+        </div>
+        <div class="card item">
+          <form id="contactForm">
+            <input type="text" name="name" placeholder="Your name" required />
+            <input type="email" name="email" placeholder="Your email" required />
+            <textarea name="message" placeholder="Your message" required></textarea>
+            <label class="note"><input type="checkbox" id="copyMe" /> Send me a copy</label>
+            <button type="submit" class="btn primary">Send message</button>
+            <div id="formStatus" class="note"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div>&copy; <span id="year"></span> Your Name. All rights reserved.</div>
+    <div class="social" style="margin-top:8px">
+      <a href="#top">Back to top</a>
+    </div>
+  </footer>
+
+  <script>
+    // Smooth scroll for nav links
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        const id = a.getAttribute('href');
+        if (id.length > 1) {
+          e.preventDefault();
+          document.querySelector(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-    </script>
+      });
+    });
+
+    // Year
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Contact form (demo handler)
+    const form = document.getElementById('contactForm');
+    const statusEl = document.getElementById('formStatus');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      statusEl.textContent = 'Sending...';
+      const data = Object.fromEntries(new FormData(form));
+      await new Promise(r => setTimeout(r, 800)); // simulate request
+      statusEl.textContent = 'Thanks! Your message has been sent.';
+      form.reset();
+    });
+
+    // Generate simple preview art on canvases
+    function drawThumb(canvas, title) {
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width = canvas.offsetWidth * 2;
+      const h = canvas.height = canvas.offsetHeight * 2;
+      const g = ctx.createLinearGradient(0,0,w,h);
+      g.addColorStop(0, '#1f2550');
+      g.addColorStop(1, '#0d1124');
+      ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+      // grid
+      ctx.strokeStyle = 'rgba(255,255,255,.06)';
+      for (let x=0; x<w; x+=w/12) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke() }
+      for (let y=0; y<h; y+=h/8) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke() }
+      // bars
+      for (let i=0;i<7;i++){
+        const cw = w/14; const x = w/10 + i*(cw+cw*.6); const bh = (Math.sin(i)+1.2)*h/5 + h/10;
+        const grad = ctx.createLinearGradient(0,0,0,bh);
+        grad.addColorStop(0, '#6c8bff'); grad.addColorStop(1, '#7ef0c5');
+        ctx.fillStyle = grad; ctx.fillRect(x, h-bh-30, cw, bh);
+      }
+      // title
+      ctx.fillStyle = 'rgba(255,255,255,.85)';
+      ctx.font = `${Math.max(22, w/18)}px system-ui, sans-serif`;
+      ctx.fillText(title, 24, 50);
+    }
+    document.querySelectorAll('canvas[data-title]').forEach(c => {
+      drawThumb(c, c.dataset.title || 'Project');
+      c.nextElementSibling?.remove();
+    });
+    window.addEventListener('resize', () => {
+      document.querySelectorAll('canvas[data-title]').forEach(c => drawThumb(c, c.dataset.title || 'Project'));
+    });
+
+    // Fake CV/PDF download (replace URL with your actual file)
+    document.getElementById('downloadCV').addEventListener('click', (e) => {
+      e.preventDefault();
+      const blob = new Blob(['Your Name - CV'], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'YourName-CV.txt'; a.click();
+      URL.revokeObjectURL(url);
+    });
+    document.getElementById('viewResume').addEventListener('click', (e) => {
+      e.preventDefault();
+      alert('Link this to your hosted resume PDF.');
+    });
+  </script>
 </body>
 </html>

@@ -1,55 +1,17 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useQuery } from '@tanstack/react-query';
 
 const Sidebar = ({ 
-  projects = [], 
+  projects, 
   selectedProject, 
+  selectedSession, 
   onProjectSelect, 
-  className,
-  isLoadingProjects,
-  conversations = [],
-  onConversationSelect,
-  selectedConversation,
-  onNewConversation,
-  showSettings,
-  onSettingsToggle,
-  onDeleteConversation,
-  starredProjects = [],
-  onToggleStarProject,
-  fetchProjects,
-  isOpen,
-  onClose
+  onSessionSelect, 
+  onNewProject,
+  isOpen, 
+  onClose 
 }) => {
-  const { data: projectsData = [], isLoading, error } = useQuery({
-    queryKey: ['projects'],
-    queryFn: fetchProjects,
-  });
-
-  // Ensure projects is always an array
-  const safeProjects = Array.isArray(projectsData) ? projectsData : [];
-
-  // Add search term state
-  const [searchTerm, setSearchTerm] = React.useState('');
-
-  const filteredProjects = useMemo(() => {
-    if (!Array.isArray(projects) || !searchTerm.trim()) return projects || [];
-
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    return projects.filter(project => 
-      project.displayName?.toLowerCase().includes(lowerSearchTerm) ||
-      project.name?.toLowerCase().includes(lowerSearchTerm)
-    );
-  }, [projects, searchTerm]);
-
-  // Add missing functions
-  const toggleStarProject = onToggleStarProject || (() => {});
-  const handleRefresh = fetchProjects || (() => {});
-  const handleNewProject = () => {};
-  const handleDeleteProject = () => {};
-  const handleRenameProject = () => {};
-
   return (
     <aside className={`
       fixed md:relative top-0 left-0 h-full w-80 bg-vscode-surface border-r border-vscode-border
@@ -68,18 +30,8 @@ const Sidebar = ({
             ×
           </Button>
         </div>
-        {/* Search input */}
-        <div className="mt-4">
-          <input
-            type="text"
-            placeholder="Search projects..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 rounded-md bg-vscode-input text-vscode-text border border-vscode-border focus:outline-none focus:ring-2 focus:ring-vscode-primary focus:border-transparent"
-          />
-        </div>
       </div>
-
+      
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
           <div>
@@ -95,7 +47,7 @@ const Sidebar = ({
                 + New
               </Button>
             </div>
-            {safeProjects.length === 0 ? (
+            {projects.length === 0 ? (
               <div className="text-center py-6">
                 <p className="text-sm text-vscode-text-muted mb-3">No projects found</p>
                 <Button 
@@ -107,7 +59,7 @@ const Sidebar = ({
               </div>
             ) : (
               <div className="space-y-2">
-                {safeProjects.map((project, index) => (
+                {projects.map((project, index) => (
                   <div
                     key={project.name || index}
                     className={`
@@ -132,7 +84,7 @@ const Sidebar = ({
               </div>
             )}
           </div>
-
+          
           {selectedProject && selectedProject.sessions && (
             <div>
               <h3 className="text-sm font-medium text-vscode-text-muted mb-2">Sessions</h3>

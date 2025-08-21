@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Conversation, type InsertConversation, type Message, type InsertMessage, users, conversations, messages, projects } from "@shared/schema";
+import { type User, type InsertUser, type Conversation, type InsertConversation, type Message, type InsertMessage, users, conversations, messages } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
@@ -7,7 +7,7 @@ import { writeFileSync, readFileSync, mkdirSync, readdirSync, statSync, existsSy
 import { join, extname } from 'path';
 import * as crypto from 'crypto';
 import { z } from 'zod';
-import { insertConversationSchema } from "@shared/schema";
+import { insertConversationSchema } from "@shared/schemas";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -245,13 +245,8 @@ export class PostgresStorage implements IStorage {
   }
 
   async getAllProjects(): Promise<any[]> {
-    try {
-      const projects = await this.db.select().from(projects);
-      return projects;
-    } catch (error) {
-      console.error("Error fetching all projects:", error);
-      return [];
-    }
+    const result = await this.db.select().from(projects);
+    return result;
   }
 
   async createProject(projectData: any): Promise<any> {
@@ -349,14 +344,7 @@ export class PostgresStorage implements IStorage {
   }
 
   async getAllConversations(): Promise<Conversation[]> {
-    const result = await this.db.select({
-          id: conversations.id,
-          projectName: conversations.projectName,
-          userId: conversations.userId,
-          createdAt: conversations.createdAt,
-          updatedAt: conversations.updatedAt,
-          name: conversations.name
-        }).from(conversations).orderBy(desc(conversations.updatedAt));
+    const result = await this.db.select().from(conversations).orderBy(desc(conversations.updatedAt));
     return result;
   }
 
