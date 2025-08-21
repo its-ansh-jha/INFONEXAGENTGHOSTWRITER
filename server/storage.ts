@@ -1,390 +1,262 @@
-import { type User, type InsertUser, type Conversation, type InsertConversation, type Message, type InsertMessage, users, conversations, messages } from "@shared/schema";
-import { randomUUID } from "crypto";
-import { drizzle } from "drizzle-orm/neon-http";
-import { neon } from "@neondatabase/serverless";
-import { eq, desc } from "drizzle-orm";
-import { writeFileSync, readFileSync, mkdirSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, extname } from 'path';
 import * as crypto from 'crypto';
 import { z } from 'zod';
-import { insertConversationSchema } from "@shared/schemas";
+import { insertConversationSchema } from "@shared/schema";
+import { db } from './index';
+import { conversations, messages, projects } from '@shared/schema';
+import { eq, and, desc } from 'drizzle-orm';
 
 // modify the interface with any CRUD methods
 // you might need
+export interface Storage {
+  // Projects
+  createProject(project: any): Promise<any>;
+  getAllProjects(): Promise<any[]>;
+  getProject(id: string): Promise<any | null>;
+  updateProject(id: string, updates: any): Promise<any>;
+  deleteProject(id: string): Promise<boolean>;
 
-export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-  // File management methods
-  getProjectFiles?(projectName: string): Promise<Array<{name: string, type: string}>>;
-  getFileContent?(projectName: string, fileName: string): Promise<string>;
-  saveFile?(projectName: string, fileName: string, content: string): Promise<void>;
-  // Project management methods
-  getAllProjects?(): Promise<any[]>;
-  createProject?(projectData: any): Promise<any>;
-  getProject?(projectName: string): Promise<any | null>;
-  // Chat management methods
-  createConversation(conversation: InsertConversation): Promise<Conversation>;
-  getConversation(id: string): Promise<Conversation | undefined>;
-  getAllConversations(): Promise<Conversation[]>;
-  getProjectConversations?(projectName: string): Promise<Conversation[]>;
-  updateConversation(id: string, updates: Partial<InsertConversation>): Promise<Conversation | undefined>;
-  addMessage(message: InsertMessage): Promise<Message>;
-  getMessages(conversationId: string): Promise<Message[]>;
+  // Conversations
+  createConversation(conversation: any): Promise<any>;
+  getAllConversations(filters?: any): Promise<any[]>;
+  getConversation(id: string): Promise<any | null>;
+  updateConversation(id: string, updates: any): Promise<any>;
   deleteConversation(id: string): Promise<boolean>;
+
+  // Messages
+  createMessage(message: any): Promise<any>;
+  getMessages(conversationId: string): Promise<any[]>;
+  updateMessage(id: string, updates: any): Promise<any>;
+  deleteMessage(id: string): Promise<boolean>;
+
+  // Files
+  writeFile(projectName: string, filename: string, content: string): Promise<void>;
+  readFile(projectName: string, filename: string): Promise<string>;
+  deleteFile(projectName: string, filename: string): Promise<void>;
+  listFiles(projectName: string): Promise<any[]>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private projectFiles: Record<string, any[]>;
-  private fileContents: Record<string, Record<string, string>>;
-  private conversations: Conversation[];
-  private messages: Message[];
-  private projects: any[];
+export class MemoryStorage implements Storage {
+  private projects: any[] = [];
+  private conversations: any[] = [];
+  private messages: any[] = [];
+  private files: Map<string, string> = new Map();
 
-  constructor() {
-    this.users = new Map();
-    this.projectFiles = {
-      "sample-project": [
-        { name: "index.html", type: "file", content: "" },
-        { name: "portfolio.html", type: "file", content: "" }
-      ]
-    };
-    this.fileContents = {
-      "sample-project": {}
-    };
-    this.conversations = [];
-    this.messages = [];
-    this.projects = [
-      {
-        id: "sample-project",
-        name: "sample-project",
-        displayName: "Sample Project",
-        path: "./sample-project",
-        createdAt: new Date().toISOString()
-      }
-    ];
-  }
-
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+  async createProject(project: any): Promise<any> {
+    const id = crypto.randomUUID();
+    const newProject = { id, ...project, createdAt: new Date() };
+    this.projects.push(newProject);
+    return newProject;
   }
 
   async getAllProjects(): Promise<any[]> {
     return this.projects;
   }
 
-  async createProject(projectData: any): Promise<any> {
-    const newProject = {
-      id: projectData.name,
-      ...projectData,
-      createdAt: new Date().toISOString()
-    };
-    this.projects.push(newProject);
-
-    // Initialize empty file structure for new project
-    this.projectFiles[projectData.name] = [];
-    this.fileContents[projectData.name] = {};
-
-    return newProject;
+  async getProject(id: string): Promise<any | null> {
+    return this.projects.find(p => p.id === id) || null;
   }
 
-  async getProject(projectName: string): Promise<any | null> {
-    return this.projects.find(p => p.name === projectName) || null;
+  async updateProject(id: string, updates: any): Promise<any> {
+    const index = this.projects.findIndex(p => p.id === id);
+    if (index === -1) throw new Error('Project not found');
+    this.projects[index] = { ...this.projects[index], ...updates };
+    return this.projects[index];
   }
 
-  async getProjectFiles(projectName: string): Promise<Array<{name: string, type: string}>> {
-    return this.projectFiles[projectName] || [];
+  async deleteProject(id: string): Promise<boolean> {
+    const index = this.projects.findIndex(p => p.id === id);
+    if (index === -1) return false;
+    this.projects.splice(index, 1);
+    return true;
   }
 
-  async getFileContent(projectName: string, fileName: string): Promise<string> {
-    return this.fileContents[projectName]?.[fileName] || '';
+  async createConversation(conversation: any): Promise<any> {
+    const id = crypto.randomUUID();
+    const newConversation = { id, ...conversation, createdAt: new Date() };
+    this.conversations.push(newConversation);
+    return newConversation;
   }
 
-  async saveFile(projectName: string, fileName: string, content: string): Promise<void> {
-    if (!this.fileContents[projectName]) {
-      this.fileContents[projectName] = {};
-    }
-    this.fileContents[projectName][fileName] = content;
-
-    if (!this.projectFiles[projectName]) {
-      this.projectFiles[projectName] = [];
-    }
-
-    const existingFile = this.projectFiles[projectName].find(f => f.name === fileName);
-    if (!existingFile) {
-      this.projectFiles[projectName].push({
-        name: fileName,
-        type: 'file',
-        content: content
-      });
-    } else {
-      existingFile.content = content; // Update content if file exists
-    }
+  async getAllConversations(filters?: any): Promise<any[]> {
+    return this.conversations;
   }
 
-  async createConversation(insertConversation: InsertConversation): Promise<Conversation> {
-    const id = randomUUID();
-    const now = new Date();
-    const conversation: Conversation = {
-      ...insertConversation,
-      id,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.conversations.push(conversation);
-    return conversation;
+  async getConversation(id: string): Promise<any | null> {
+    return this.conversations.find(c => c.id === id) || null;
   }
 
-  async getConversation(id: string): Promise<Conversation | undefined> {
-    return this.conversations.find(c => c.id === id);
-  }
-
-  async getAllConversations(): Promise<Conversation[]> {
-    return this.conversations.sort(
-      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
-    );
-  }
-
-  async getProjectConversations(projectName: string): Promise<Conversation[]> {
-    return this.conversations.filter(c => c.projectName === projectName).sort(
-      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
-    );
-  }
-
-  async updateConversation(id: string, updates: Partial<InsertConversation>): Promise<Conversation | undefined> {
-    const conversation = this.conversations.find(c => c.id === id);
-    if (!conversation) return undefined;
-
-    const updated: Conversation = {
-      ...conversation,
-      ...updates,
-      updatedAt: new Date(),
-    };
-
+  async updateConversation(id: string, updates: any): Promise<any> {
     const index = this.conversations.findIndex(c => c.id === id);
-    if (index !== -1) {
-      this.conversations[index] = updated;
-    }
-    return updated;
+    if (index === -1) throw new Error('Conversation not found');
+    this.conversations[index] = { ...this.conversations[index], ...updates };
+    return this.conversations[index];
   }
 
-  async addMessage(insertMessage: InsertMessage): Promise<Message> {
-    const id = randomUUID();
-    const message: Message = {
-      ...insertMessage,
-      id,
-      createdAt: new Date(),
-      metadata: insertMessage.metadata || null,
-    };
-
-    this.messages.push(message);
-
-    // Update conversation's updatedAt timestamp
-    await this.updateConversation(insertMessage.conversationId, {});
-
-    return message;
+  async deleteConversation(id: string): Promise<boolean> {
+    const index = this.conversations.findIndex(c => c.id === id);
+    if (index === -1) return false;
+    this.conversations.splice(index, 1);
+    return true;
   }
 
-  async getMessages(conversationId: string): Promise<Message[]> {
+  async createMessage(message: any): Promise<any> {
+    const id = crypto.randomUUID();
+    const newMessage = { id, ...message, createdAt: new Date() };
+    this.messages.push(newMessage);
+    return newMessage;
+  }
+
+  async getMessages(conversationId: string): Promise<any[]> {
     return this.messages.filter(m => m.conversationId === conversationId);
   }
 
-  async deleteConversation(id: string): Promise<boolean> {
-    const index = this.conversations.findIndex(c => c.id === id);
-    if (index !== -1) {
-      this.conversations.splice(index, 1);
-      // Also delete associated messages
-      const messageIndices = this.messages.map((m, i) => m.conversationId === id ? i : -1).filter(i => i !== -1);
-      messageIndices.reverse().forEach(i => this.messages.splice(i, 1));
-      return true;
+  async updateMessage(id: string, updates: any): Promise<any> {
+    const index = this.messages.findIndex(m => m.id === id);
+    if (index === -1) throw new Error('Message not found');
+    this.messages[index] = { ...this.messages[index], ...updates };
+    return this.messages[index];
+  }
+
+  async deleteMessage(id: string): Promise<boolean> {
+    const index = this.messages.findIndex(m => m.id === id);
+    if (index === -1) return false;
+    this.messages.splice(index, 1);
+    return true;
+  }
+
+  async writeFile(projectName: string, filename: string, content: string): Promise<void> {
+    const key = `${projectName}/${filename}`;
+    this.files.set(key, content);
+  }
+
+  async readFile(projectName: string, filename: string): Promise<string> {
+    const key = `${projectName}/${filename}`;
+    const content = this.files.get(key);
+    if (content === undefined) {
+      throw new Error(`File not found: ${filename}`);
     }
-    return false;
+    return content;
+  }
+
+  async deleteFile(projectName: string, filename: string): Promise<void> {
+    const key = `${projectName}/${filename}`;
+    this.files.delete(key);
+  }
+
+  async listFiles(projectName: string): Promise<any[]> {
+    const prefix = `${projectName}/`;
+    const files: any[] = [];
+
+    for (const [key, content] of this.files.entries()) {
+      if (key.startsWith(prefix)) {
+        const filename = key.substring(prefix.length);
+        files.push({
+          name: filename,
+          type: 'file',
+          extension: extname(filename),
+          size: content.length
+        });
+      }
+    }
+
+    return files;
   }
 }
 
-// PostgreSQL Storage Implementation
-export class PostgresStorage implements IStorage {
-  private db;
-
-  constructor() {
-    if (!process.env.DATABASE_URL) {
-      throw new Error('DATABASE_URL environment variable is required');
-    }
-    const sql = neon(process.env.DATABASE_URL);
-    this.db = drizzle(sql);
-  }
-
-  async getUser(id: string): Promise<User | undefined> {
-    const result = await this.db.select().from(users).where(eq(users.id, id)).limit(1);
-    return result[0];
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await this.db.select().from(users).where(eq(users.username, username)).limit(1);
-    return result[0];
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const result = await this.db.insert(users).values(insertUser).returning();
-    return result[0];
+export class PostgresStorage implements Storage {
+  async createProject(project: any): Promise<any> {
+    const [result] = await db.insert(projects).values(project).returning();
+    return result;
   }
 
   async getAllProjects(): Promise<any[]> {
-    const result = await this.db.select().from(projects);
-    return result;
+    return await db.select().from(projects);
   }
 
-  async createProject(projectData: any): Promise<any> {
-    const newProject = {
-      ...projectData,
-      createdAt: new Date().toISOString()
-    };
-    const result = await this.db.insert(projects).values(newProject).returning();
-    return result[0];
-  }
-
-  async getProject(projectName: string): Promise<any | null> {
-    const result = await this.db.select().from(projects).where(eq(projects.name, projectName)).limit(1);
+  async getProject(id: string): Promise<any | null> {
+    const result = await db.select().from(projects).where(eq(projects.id, id));
     return result[0] || null;
   }
 
-  async getProjectFiles(projectName: string): Promise<Array<{name: string, type: string}>> {
-    const projectPath = join(process.cwd(), 'projects', projectName);
-
-    if (!existsSync(projectPath)) {
-      return [];
-    }
-
-    try {
-      const files = readdirSync(projectPath);
-      return files.map(fileName => {
-        const filePath = join(projectPath, fileName);
-        const stats = statSync(filePath);
-        const ext = extname(fileName);
-
-        let type = 'file';
-        if (stats.isDirectory()) {
-          type = 'directory';
-        } else if (['.html', '.htm'].includes(ext)) {
-          type = 'html';
-        } else if (['.js', '.jsx', '.ts', '.tsx'].includes(ext)) {
-          type = 'javascript';
-        } else if (['.css', '.scss', '.sass'].includes(ext)) {
-          type = 'css';
-        } else if (['.json'].includes(ext)) {
-          type = 'json';
-        } else if (['.md', '.txt'].includes(ext)) {
-          type = 'text';
-        }
-
-        return { name: fileName, type };
-      }).filter(file => file.type !== 'directory'); // Only return files, not directories
-    } catch (error) {
-      console.error(`Error reading project files for ${projectName}:`, error);
-      return [];
-    }
-  }
-
-  async getFileContent(projectName: string, fileName: string): Promise<string> {
-    const filePath = join(process.cwd(), 'projects', projectName, fileName);
-
-    try {
-      if (existsSync(filePath)) {
-        return readFileSync(filePath, 'utf-8');
-      }
-      return '';
-    } catch (error) {
-      console.error(`Error reading file ${fileName} in project ${projectName}:`, error);
-      return '';
-    }
-  }
-
-  async saveFile(projectName: string, fileName: string, content: string): Promise<void> {
-    const projectPath = join(process.cwd(), 'projects', projectName);
-    const filePath = join(projectPath, fileName);
-
-    try {
-      // Create project directory if it doesn't exist
-      if (!existsSync(projectPath)) {
-        mkdirSync(projectPath, { recursive: true });
-      }
-
-      // Write the file
-      writeFileSync(filePath, content, 'utf-8');
-      console.log(`File saved: ${filePath}`);
-    } catch (error) {
-      console.error(`Error saving file ${fileName} in project ${projectName}:`, error);
-      throw error;
-    }
-  }
-
-  async createConversation(insertConversation: InsertConversation): Promise<Conversation> {
-    const result = await this.db.insert(conversations).values(insertConversation).returning();
-    return result[0];
-  }
-
-  async getConversation(id: string): Promise<Conversation | undefined> {
-    const result = await this.db.select().from(conversations).where(eq(conversations.id, id)).limit(1);
-    return result[0];
-  }
-
-  async getAllConversations(): Promise<Conversation[]> {
-    const result = await this.db.select().from(conversations).orderBy(desc(conversations.updatedAt));
+  async updateProject(id: string, updates: any): Promise<any> {
+    const [result] = await db.update(projects).set(updates).where(eq(projects.id, id)).returning();
     return result;
   }
 
-  async getProjectConversations(projectName: string): Promise<Conversation[]> {
-    const result = await this.db.select().from(conversations).where(eq(conversations.projectName, projectName)).orderBy(desc(conversations.updatedAt));
+  async deleteProject(id: string): Promise<boolean> {
+    const result = await db.delete(projects).where(eq(projects.id, id));
+    return result.rowCount > 0;
+  }
+
+  async createConversation(conversation: any): Promise<any> {
+    const [result] = await db.insert(conversations).values(conversation).returning();
     return result;
   }
 
-  async updateConversation(id: string, updates: Partial<InsertConversation>): Promise<Conversation | undefined> {
-    const result = await this.db
-      .update(conversations)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(conversations.id, id))
-      .returning();
-    return result[0];
+  async getAllConversations(filters?: any): Promise<any[]> {
+    let query = db.select().from(conversations);
+
+    if (filters?.projectId) {
+      query = query.where(eq(conversations.projectId, filters.projectId));
+    }
+
+    return await query.orderBy(desc(conversations.createdAt));
   }
 
-  async addMessage(insertMessage: InsertMessage): Promise<Message> {
-    const result = await this.db.insert(messages).values(insertMessage).returning();
-
-    // Update conversation's updatedAt timestamp
-    await this.updateConversation(insertMessage.conversationId, {});
-
-    return result[0];
+  async getConversation(id: string): Promise<any | null> {
+    const result = await db.select().from(conversations).where(eq(conversations.id, id));
+    return result[0] || null;
   }
 
-  async getMessages(conversationId: string): Promise<Message[]> {
-    const result = await this.db
-      .select()
-      .from(messages)
-      .where(eq(messages.conversationId, conversationId))
-      .orderBy(messages.createdAt);
+  async updateConversation(id: string, updates: any): Promise<any> {
+    const [result] = await db.update(conversations).set(updates).where(eq(conversations.id, id)).returning();
     return result;
   }
 
   async deleteConversation(id: string): Promise<boolean> {
-    const result = await this.db.delete(conversations).where(eq(conversations.id, id)).returning();
-    return result.length > 0;
+    const result = await db.delete(conversations).where(eq(conversations.id, id));
+    return result.rowCount > 0;
+  }
+
+  async createMessage(message: any): Promise<any> {
+    const [result] = await db.insert(messages).values(message).returning();
+    return result;
+  }
+
+  async getMessages(conversationId: string): Promise<any[]> {
+    return await db.select().from(messages).where(eq(messages.conversationId, conversationId));
+  }
+
+  async updateMessage(id: string, updates: any): Promise<any> {
+    const [result] = await db.update(messages).set(updates).where(eq(messages.id, id)).returning();
+    return result;
+  }
+
+  async deleteMessage(id: string): Promise<boolean> {
+    const result = await db.delete(messages).where(eq(messages.id, id));
+    return result.rowCount > 0;
+  }
+
+  async writeFile(projectName: string, filename: string, content: string): Promise<void> {
+    // File operations would be implemented based on your file storage strategy
+    throw new Error('File operations not implemented for PostgresStorage');
+  }
+
+  async readFile(projectName: string, filename: string): Promise<string> {
+    throw new Error('File operations not implemented for PostgresStorage');
+  }
+
+  async deleteFile(projectName: string, filename: string): Promise<void> {
+    throw new Error('File operations not implemented for PostgresStorage');
+  }
+
+  async listFiles(projectName: string): Promise<any[]> {
+    throw new Error('File operations not implemented for PostgresStorage');
   }
 }
 
-// Use PostgreSQL storage in production, fallback to memory storage for development
-export const storage: IStorage = process.env.DATABASE_URL ? new PostgresStorage() : new MemStorage();
+// Export a storage instance
+export const storage: Storage = process.env.DATABASE_URL 
+  ? new PostgresStorage() 
+  : new MemoryStorage();

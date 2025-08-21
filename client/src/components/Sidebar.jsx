@@ -1,9 +1,10 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const Sidebar = ({ 
-  projects, 
+  projects = [], 
   selectedProject, 
   selectedSession, 
   onProjectSelect, 
