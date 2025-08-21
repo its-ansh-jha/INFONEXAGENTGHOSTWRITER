@@ -18,7 +18,9 @@ const Sidebar = ({
   onDeleteConversation,
   starredProjects = [],
   onToggleStarProject,
-  fetchProjects
+  fetchProjects,
+  isOpen,
+  onClose
 }) => {
   const { data: projectsData = [], isLoading, error } = useQuery({
     queryKey: ['projects'],
@@ -27,7 +29,7 @@ const Sidebar = ({
 
   // Ensure projects is always an array
   const safeProjects = Array.isArray(projectsData) ? projectsData : [];
-  
+
   // Add search term state
   const [searchTerm, setSearchTerm] = React.useState('');
 
