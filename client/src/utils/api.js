@@ -46,6 +46,28 @@ export const api = {
     body: JSON.stringify({ content }),
   }),
   
+  // Conversations API
+  conversations: {
+    getAll: () => apiFetch(`${API_BASE}/conversations`),
+    create: (data) => apiFetch(`${API_BASE}/conversations`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    get: (id) => apiFetch(`${API_BASE}/conversations/${id}`),
+    update: (id, data) => apiFetch(`${API_BASE}/conversations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+    delete: (id) => apiFetch(`${API_BASE}/conversations/${id}`, {
+      method: 'DELETE',
+    }),
+    getMessages: (id) => apiFetch(`${API_BASE}/conversations/${id}/messages`),
+    addMessage: (id, data) => apiFetch(`${API_BASE}/conversations/${id}/messages`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  },
+  
   // Cursor API (legacy - keeping for compatibility)
   cursor: {
     sessions: (projectPath) => apiFetch(`${API_BASE}/cursor/sessions?projectPath=${encodeURIComponent(projectPath)}`),
