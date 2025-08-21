@@ -1,8 +1,56 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { api } from '../utils/api';
+
+// Memoized message component for better performance
+const MessageComponent = React.memo(({ message }) => {
+  const isUser = message.role === 'user';
+  
+  return (
+    <div
+      className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}
+    >
+      <div
+        className={`max-w-[80%] p-3 rounded-lg ${
+          isUser
+            ? 'bg-vscode-primary text-white'
+            : message.isError
+            ? 'bg-vscode-error text-white'
+            : 'bg-vscode-surface border border-vscode-border text-vscode-text'
+        }`}
+      >
+        <div className="text-sm mb-1">
+          <span className="font-semibold">
+            {isUser ? 'You' : 'AI Assistant'}
+          </span>
+          <span className="text-xs opacity-70 ml-2">
+            {new Date(message.timestamp).toLocaleTimeString()}
+          </span>
+        </div>
+        <div className="whitespace-pre-wrap max-h-96 overflow-y-auto">
+          {message.content}
+        </div>
+        {message.fileCreated && (
+          <div className="text-xs bg-green-900/20 text-green-400 px-2 py-1 rounded mt-2">
+            ✓ Created file: {message.fileCreated}
+          </div>
+        )}
+        {message.hasToolCalls && (
+          <div className="text-xs bg-blue-900/20 text-blue-400 px-2 py-1 rounded mt-2">
+            ✓ Used file operations
+          </div>
+        )}
+        {message.usage && (
+          <div className="text-xs opacity-70 mt-2">
+            Tokens: {message.usage.total_tokens} ({message.usage.prompt_tokens} + {message.usage.completion_tokens})
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
 
 const ChatInterface = ({ selectedProject, selectedSession }) => {
   const [messages, setMessages] = useState([]);
@@ -10,11 +58,22 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const messagesEndRef = useRef(null);
+  const scrollAreaRef = useRef(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const scrollToBottom = useCallback(() => {
+    if (shouldAutoScroll) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [shouldAutoScroll]);
+
+  // Handle scroll behavior - disable auto-scroll when user scrolls up
+  const handleScroll = useCallback((e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.target;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+    setShouldAutoScroll(isAtBottom);
+  }, []);
 
   // Initialize conversation and load messages on mount
   useEffect(() => {
@@ -25,7 +84,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, scrollToBottom]);
 
   const initializeChat = async () => {
     try {
@@ -131,109 +190,70 @@ If user asks you to copy or base a new file on an existing one, make sure to mai
         console.error('Error fetching project files:', error);
       }
 
-      // Call GPT-5 API
+      // Call OpenAI API with tools
       const response = await api.gpt5.chat({
         messages: [
           {
             role: 'system',
-            content: `You are an expert coding assistant for the project "${selectedProject?.displayName || 'Unknown Project'}".${projectFilesContext}
+            content: `You are an expert coding assistant for the project "${selectedProject?.displayName || 'Unknown Project'}".
+
+            TOOLS AVAILABLE:
+            - read_file: Read content of existing project files
+            - write_file: Create or update project files  
+            - list_files: See all files in the project
 
             IMPORTANT RULES:
-            1. Keep responses concise - avoid showing large code blocks in chat
-            2. When creating OR editing files, use this exact format: CREATE_FILE: filename.ext \`\`\`file content here\`\`\`
-            3. For websites, create complete HTML files with inline CSS and JavaScript
-            4. After using CREATE_FILE, provide a brief description of what you created/edited
-            5. Focus on practical solutions rather than lengthy explanations
-            6. When building websites, make them fully functional with inline styles and scripts
-            7. IMPORTANT: When user asks to "edit" or "modify" or "update" a website/file, always provide the COMPLETE updated file content using CREATE_FILE format - this will replace the existing file
-            8. When user asks to create a file based on an existing file, reference the existing project files listed above and maintain consistency
-            9. If you need to see the content of an existing file to help with your response, use this format: VIEW_FILE: filename.ext
-            10. You can view multiple files if needed: VIEW_FILE: file1.html VIEW_FILE: file2.css
+            1. Use the available tools to read existing files before making changes
+            2. Always use write_file tool to create or update files - this automatically saves them
+            3. Keep chat responses concise and informative
+            4. For websites, create complete HTML files with inline CSS and JavaScript
+            5. When editing files, first read the existing content, then write the complete updated version
+            6. Focus on practical solutions rather than lengthy explanations
+            7. Use list_files to understand the project structure when needed
             
-            Example: If user asks for a website, respond with:
-            "I'll create a complete website for you.
-            
-            CREATE_FILE: index.html
-            \`\`\`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>/* CSS here */</style>
-            </head>
-            <body>
-                <!-- HTML content -->
-                <script>/* JS here */</script>
-            </body>
-            </html>
-            \`\`\`
-            
-            The website includes [brief description of features]."
-            
-            When editing existing files, always provide the FULL updated code using the same CREATE_FILE format.
+            WORKFLOW:
+            - For new files: Use write_file directly
+            - For editing: Use read_file first, then write_file with complete updated content
+            - For project overview: Use list_files to see what exists
             
             Provide helpful guidance while keeping responses compact and actionable.`
           },
           ...messages.map(msg => ({ role: msg.role, content: msg.content })),
           { role: 'user', content: userMessageContent }
         ],
+        project_name: selectedProject.name,
+        use_tools: true,
         max_tokens: 10000
       });
 
       const result = await response.json();
       
       if (result.success && result.data.choices?.[0]?.message) {
-        let content = result.data.choices[0].message.content;
-        
-        // Check if the AI wants to view files first
-        const viewFileMatches = content.match(/VIEW_FILE:\s*(\S+)/g);
-        if (viewFileMatches && selectedProject) {
-          let fileContents = '';
-          for (const match of viewFileMatches) {
-            const fileName = match.replace(/VIEW_FILE:\s*/, '').trim();
-            try {
-              const fileResponse = await api.getFileContent(selectedProject.name, fileName);
-              const fileData = await fileResponse.json();
-              fileContents += `\n\n--- Content of ${fileName} ---\n${fileData.content || 'File not found or empty'}\n--- End of ${fileName} ---`;
-            } catch (error) {
-              console.error(`Error reading file ${fileName}:`, error);
-              fileContents += `\n\n--- Error reading ${fileName} ---\n`;
-            }
-          }
-          
-          if (fileContents) {
-            // Send file contents back to AI for a follow-up response
-            const followUpResponse = await api.gpt5.chat({
-              messages: [
-                {
-                  role: 'system',
-                  content: `Here are the file contents you requested:${fileContents}\n\nNow provide your response based on this information. Do not show the file contents in your response unless specifically asked.`
-                },
-                ...messages.map(msg => ({ role: msg.role, content: msg.content })),
-                { role: 'user', content: userMessageContent }
-              ],
-              max_tokens: 10000
-            });
-            
-            const followUpResult = await followUpResponse.json();
-            if (followUpResult.success && followUpResult.data.choices?.[0]?.message) {
-              content = followUpResult.data.choices[0].message.content;
-            }
-          }
-        }
-        
-        // Check if the AI wants to create a file
-        const fileMatch = content.match(/CREATE_FILE:\s*(\S+)\s*```([\s\S]*?)```/);
-        if (fileMatch && selectedProject) {
-          const [, fileName, fileContent] = fileMatch;
-          try {
-            await api.saveFile(selectedProject.name, fileName, fileContent.trim());
-            
-            // Save assistant success message to database and show it
-            const assistantContent = `✅ I've successfully updated "${fileName}" for you! You can view the changes in the Files tab, or see the preview in the Preview tab if it's an HTML file.`;
+        // Handle tool calls if present
+        if (result.needs_followup && result.tool_results) {
+          // Construct messages with tool results for follow-up response
+          const followUpMessages = [
+            ...messages.map(msg => ({ role: msg.role, content: msg.content })),
+            { role: 'user', content: userMessageContent },
+            result.data.choices[0].message,
+            ...result.tool_results
+          ];
+
+          const followUpResponse = await api.gpt5.chat({
+            messages: followUpMessages,
+            project_name: selectedProject.name,
+            use_tools: false, // Disable tools for follow-up to get final response
+            max_tokens: 10000
+          });
+
+          const followUpResult = await followUpResponse.json();
+          if (followUpResult.success && followUpResult.data.choices?.[0]?.message) {
+            // Save final AI response to database
+            const assistantContent = followUpResult.data.choices[0].message.content || 'No response content received';
             const assistantMessageResponse = await api.conversations.addMessage(currentConversation.id, {
               type: 'assistant',
               content: assistantContent,
-              metadata: { hasFileOperations: true, fileCreated: fileName, usage: result.usage }
+              metadata: { hasToolCalls: true, usage: followUpResult.usage }
             });
             const assistantMessageData = await assistantMessageResponse.json();
             
@@ -243,35 +263,14 @@ If user asks you to copy or base a new file on an existing one, make sure to mai
               content: assistantContent,
               timestamp: assistantMessageData.message.createdAt,
               conversationId: currentConversation.id,
-              usage: result.usage,
-              fileCreated: fileName
-            };
-            setMessages(prev => [...prev, assistantMessage]);
-          } catch (error) {
-            console.error('Error saving file:', error);
-            // Save error message to database
-            const errorContent = `❌ I couldn't update the file "${fileName}" automatically. Please try again or edit it manually in the Files tab.`;
-            const errorMessageResponse = await api.conversations.addMessage(currentConversation.id, {
-              type: 'assistant',
-              content: errorContent,
-              metadata: { isError: true, fileName: fileName, usage: result.usage }
-            });
-            const errorMessageData = await errorMessageResponse.json();
-            
-            const assistantMessage = {
-              id: errorMessageData.message.id,
-              role: 'assistant',
-              content: errorContent,
-              timestamp: errorMessageData.message.createdAt,
-              conversationId: currentConversation.id,
-              usage: result.usage,
-              isError: true
+              usage: followUpResult.usage,
+              hasToolCalls: true
             };
             setMessages(prev => [...prev, assistantMessage]);
           }
         } else {
-          // Save regular AI response to database
-          const assistantContent = content || 'No response content received';
+          // Regular response without tools
+          const assistantContent = result.data.choices[0].message.content || 'No response content received';
           const assistantMessageResponse = await api.conversations.addMessage(currentConversation.id, {
             type: 'assistant',
             content: assistantContent,
@@ -352,48 +351,12 @@ If user asks you to copy or base a new file on an existing one, make sure to mai
     }
   };
 
-  const renderMessage = (message) => {
-    const isUser = message.role === 'user';
-    
-    return (
-      <div
-        key={message.id}
-        className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}
-      >
-        <div
-          className={`max-w-[80%] p-3 rounded-lg ${
-            isUser
-              ? 'bg-vscode-primary text-white'
-              : message.isError
-              ? 'bg-vscode-error text-white'
-              : 'bg-vscode-surface border border-vscode-border text-vscode-text'
-          }`}
-        >
-          <div className="text-sm mb-1">
-            <span className="font-semibold">
-              {isUser ? 'You' : 'AI Assistant'}
-            </span>
-            <span className="text-xs opacity-70 ml-2">
-              {new Date(message.timestamp).toLocaleTimeString()}
-            </span>
-          </div>
-          <div className="whitespace-pre-wrap max-h-96 overflow-y-auto">
-            {message.content}
-          </div>
-          {message.fileCreated && (
-            <div className="text-xs bg-green-900/20 text-green-400 px-2 py-1 rounded mt-2">
-              ✓ Created file: {message.fileCreated}
-            </div>
-          )}
-          {message.usage && (
-            <div className="text-xs opacity-70 mt-2">
-              Tokens: {message.usage.total_tokens} ({message.usage.prompt_tokens} + {message.usage.completion_tokens})
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+  // Optimize message rendering with useMemo for large message lists
+  const renderedMessages = useMemo(() => {
+    return messages.map(message => (
+      <MessageComponent key={message.id} message={message} />
+    ));
+  }, [messages]);
 
   if (!selectedProject) {
     return (
@@ -418,7 +381,7 @@ If user asks you to copy or base a new file on an existing one, make sure to mai
 
   return (
     <div className="flex flex-col h-full">
-      <div className="border-b border-vscode-border p-4">
+      <div className="flex-shrink-0 border-b border-vscode-border p-4">
         <h3 className="text-lg font-semibold text-vscode-text">
           AI Chat Assistant
         </h3>
@@ -427,7 +390,11 @@ If user asks you to copy or base a new file on an existing one, make sure to mai
         </p>
       </div>
 
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea 
+        className="flex-1 p-4" 
+        ref={scrollAreaRef}
+        onScroll={handleScroll}
+      >
         {messages.length === 0 ? (
           <div className="text-center text-vscode-text-muted py-8">
             <h4 className="text-lg font-medium mb-2">Welcome to AI Chat!</h4>
@@ -445,7 +412,7 @@ If user asks you to copy or base a new file on an existing one, make sure to mai
           </div>
         ) : (
           <>
-            {messages.map(renderMessage)}
+            {renderedMessages}
             {isLoading && (
               <div className="flex justify-start mb-4">
                 <div className="bg-vscode-surface border border-vscode-border text-vscode-text p-3 rounded-lg">
@@ -459,12 +426,27 @@ If user asks you to copy or base a new file on an existing one, make sure to mai
                 </div>
               </div>
             )}
+            {/* Scroll to bottom button when not at bottom */}
+            {!shouldAutoScroll && messages.length > 5 && (
+              <div className="fixed bottom-20 right-4 z-10">
+                <Button
+                  onClick={() => {
+                    setShouldAutoScroll(true);
+                    scrollToBottom();
+                  }}
+                  className="bg-vscode-primary text-white rounded-full p-2 shadow-lg"
+                  size="sm"
+                >
+                  ↓ New messages
+                </Button>
+              </div>
+            )}
           </>
         )}
         <div ref={messagesEndRef} />
       </ScrollArea>
 
-      <div className="border-t border-vscode-border p-4">
+      <div className="flex-shrink-0 border-t border-vscode-border p-4">
         <form onSubmit={handleSendMessage} className="flex space-x-2">
           <Input
             type="text"

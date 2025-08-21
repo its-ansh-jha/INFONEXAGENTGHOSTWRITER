@@ -12,32 +12,188 @@ const openai = new OpenAI({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // GPT-5 Chat endpoint
+  // Define OpenAI function tools for file operations
+  const fileOperationTools = [
+    {
+      type: "function",
+      function: {
+        name: "read_file",
+        description: "Read the content of a file in the current project",
+        parameters: {
+          type: "object",
+          properties: {
+            filename: {
+              type: "string",
+              description: "The name of the file to read (e.g., 'index.html', 'style.css')"
+            }
+          },
+          required: ["filename"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "write_file",
+        description: "Create or update a file in the current project",
+        parameters: {
+          type: "object",
+          properties: {
+            filename: {
+              type: "string",
+              description: "The name of the file to create/update (e.g., 'index.html', 'script.js')"
+            },
+            content: {
+              type: "string",
+              description: "The complete content to write to the file"
+            }
+          },
+          required: ["filename", "content"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "list_files",
+        description: "List all files in the current project",
+        parameters: {
+          type: "object",
+          properties: {},
+          required: []
+        }
+      }
+    }
+  ];
+
+  // GPT-5 Chat endpoint with OpenAI tools
   app.post('/api/gpt5/chat', async (req, res) => {
     try {
-      const { model = 'gpt-5', messages, reasoning_effort = 'minimal', verbosity = 'medium', ...options } = req.body;
+      const { 
+        model = 'gpt-4o', // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+        messages, 
+        project_name,
+        use_tools = true,
+        max_tokens = 10000,
+        ...options 
+      } = req.body;
 
       if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: 'Messages array is required' });
       }
 
-      // GPT-5 requires max_completion_tokens instead of max_tokens
-      // GPT-5 only supports default temperature value (1)
-      const requestParams = {
+      const requestParams: any = {
         model: model,
         messages: messages,
-        reasoning_effort: reasoning_effort,
-        verbosity: verbosity,
-        max_completion_tokens: options.max_completion_tokens || options.max_tokens || 10000
+        max_tokens: max_tokens,
+        temperature: 0.7,
+        ...options
       };
+
+      // Add tools if requested
+      if (use_tools) {
+        requestParams.tools = fileOperationTools;
+        requestParams.tool_choice = "auto";
+      }
 
       const response = await openai.chat.completions.create(requestParams);
 
-      res.json({
-        success: true,
-        data: response,
-        usage: response.usage
-      });
+      // Handle tool calls if present
+      if (response.choices[0].message.tool_calls) {
+        const toolResults = [];
+        
+        for (const toolCall of response.choices[0].message.tool_calls) {
+          const { name, arguments: args } = toolCall.function;
+          const parsedArgs = JSON.parse(args);
+          
+          try {
+            let result;
+            switch (name) {
+              case 'read_file':
+                try {
+                  const projectPath = join(process.cwd(), 'projects', project_name || 'sample-project');
+                  const filePath = join(projectPath, parsedArgs.filename);
+                  
+                  if (existsSync(filePath)) {
+                    const fs = await import('fs/promises');
+                    const content = await fs.readFile(filePath, 'utf-8');
+                    result = content || 'File is empty';
+                  } else {
+                    result = `Error: File '${parsedArgs.filename}' not found`;
+                  }
+                } catch (error: any) {
+                  result = `Error reading file: ${error.message}`;
+                }
+                break;
+                
+              case 'write_file':
+                try {
+                  const projectPath = join(process.cwd(), 'projects', project_name || 'sample-project');
+                  const filePath = join(projectPath, parsedArgs.filename);
+                  
+                  const fs = await import('fs/promises');
+                  // Ensure directory exists
+                  await fs.mkdir(projectPath, { recursive: true });
+                  await fs.writeFile(filePath, parsedArgs.content, 'utf-8');
+                  result = `Successfully created/updated '${parsedArgs.filename}'`;
+                } catch (error: any) {
+                  result = `Error writing file: ${error.message}`;
+                }
+                break;
+                
+              case 'list_files':
+                try {
+                  const projectPath = join(process.cwd(), 'projects', project_name || 'sample-project');
+                  
+                  if (existsSync(projectPath)) {
+                    const files = readdirSync(projectPath);
+                    const filesList = files.map(fileName => {
+                      const filePath = join(projectPath, fileName);
+                      const stat = statSync(filePath);
+                      return `${fileName} (${stat.isDirectory() ? 'directory' : 'file'})`;
+                    }).join('\n');
+                    result = `Current project files:\n${filesList || 'No files found'}`;
+                  } else {
+                    result = 'Project directory not found';
+                  }
+                } catch (error: any) {
+                  result = `Error listing files: ${error.message}`;
+                }
+                break;
+                
+              default:
+                result = `Unknown tool: ${name}`;
+            }
+            
+            toolResults.push({
+              tool_call_id: toolCall.id,
+              role: "tool",
+              content: result
+            });
+          } catch (error: any) {
+            toolResults.push({
+              tool_call_id: toolCall.id,
+              role: "tool", 
+              content: `Error executing ${name}: ${error.message}`
+            });
+          }
+        }
+
+        // Send back with tool results for follow-up response
+        res.json({
+          success: true,
+          data: response,
+          tool_results: toolResults,
+          usage: response.usage,
+          needs_followup: true
+        });
+      } else {
+        res.json({
+          success: true,
+          data: response,
+          usage: response.usage
+        });
+      }
 
     } catch (error: any) {
       console.error('GPT-5 API Error:', error);
@@ -51,7 +207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.status(500).json({ 
         error: 'Internal server error',
-        message: error?.message || 'Failed to process GPT-5 request'
+        message: error?.message || 'Failed to process GPT request'
       });
     }
   });

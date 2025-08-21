@@ -20,8 +20,8 @@ const MainContent = ({
   };
   return (
     <main className="flex-1 flex flex-col bg-vscode-bg">
-      {/* Header */}
-      <header className="bg-vscode-surface border-b border-vscode-border p-4">
+      {/* Header - Fixed at top */}
+      <header className="sticky top-0 z-50 bg-vscode-surface border-b border-vscode-border p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Button
@@ -80,8 +80,8 @@ const MainContent = ({
         </div>
       </header>
 
-      {/* Content */}
-      <div className="flex-1 flex flex-col">
+      {/* Content - Accounts for fixed header */}
+      <div className="flex-1 flex flex-col overflow-hidden">
         {!selectedProject ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center text-vscode-text-muted max-w-md">
