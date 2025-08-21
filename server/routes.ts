@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { insertConversationSchema, insertMessageSchema } from "@shared/schema";
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
@@ -35,7 +36,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         usage: response.usage
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('GPT-5 API Error:', error);
       
       if (error.status === 401) {
@@ -47,7 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.status(500).json({ 
         error: 'Internal server error',
-        message: error.message || 'Failed to process GPT-5 request'
+        message: error?.message || 'Failed to process GPT-5 request'
       });
     }
   });
@@ -117,6 +118,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     res.json({ success: true, message: "File updated successfully" });
+  });
+
+  // Chat conversation endpoints
+  app.get("/api/conversations", async (req, res) => {
+    try {
+      const conversations = await storage.getAllConversations();
+      res.json({ conversations });
+    } catch (error: any) {
+      console.error('Error fetching conversations:', error);
+      res.status(500).json({ error: 'Failed to fetch conversations' });
+    }
+  });
+
+  app.post("/api/conversations", async (req, res) => {
+    try {
+      const validatedData = insertConversationSchema.parse(req.body);
+      const conversation = await storage.createConversation(validatedData);
+      res.json({ success: true, conversation });
+    } catch (error: any) {
+      console.error('Error creating conversation:', error);
+      res.status(400).json({ error: 'Failed to create conversation', message: error?.message });
+    }
+  });
+
+  app.get("/api/conversations/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const conversation = await storage.getConversation(id);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: 'Conversation not found' });
+      }
+      
+      res.json({ conversation });
+    } catch (error: any) {
+      console.error('Error fetching conversation:', error);
+      res.status(500).json({ error: 'Failed to fetch conversation' });
+    }
+  });
+
+  app.put("/api/conversations/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = insertConversationSchema.partial().parse(req.body);
+      const conversation = await storage.updateConversation(id, updates);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: 'Conversation not found' });
+      }
+      
+      res.json({ success: true, conversation });
+    } catch (error: any) {
+      console.error('Error updating conversation:', error);
+      res.status(400).json({ error: 'Failed to update conversation', message: error?.message });
+    }
+  });
+
+  app.delete("/api/conversations/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteConversation(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: 'Conversation not found' });
+      }
+      
+      res.json({ success: true, message: 'Conversation deleted' });
+    } catch (error: any) {
+      console.error('Error deleting conversation:', error);
+      res.status(500).json({ error: 'Failed to delete conversation' });
+    }
+  });
+
+  app.get("/api/conversations/:id/messages", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Verify conversation exists
+      const conversation = await storage.getConversation(id);
+      if (!conversation) {
+        return res.status(404).json({ error: 'Conversation not found' });
+      }
+      
+      const messages = await storage.getMessages(id);
+      res.json({ messages });
+    } catch (error: any) {
+      console.error('Error fetching messages:', error);
+      res.status(500).json({ error: 'Failed to fetch messages' });
+    }
+  });
+
+  app.post("/api/conversations/:id/messages", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Verify conversation exists
+      const conversation = await storage.getConversation(id);
+      if (!conversation) {
+        return res.status(404).json({ error: 'Conversation not found' });
+      }
+      
+      const messageData = { ...req.body, conversationId: id };
+      const validatedData = insertMessageSchema.parse(messageData);
+      const message = await storage.addMessage(validatedData);
+      
+      res.json({ success: true, message });
+    } catch (error: any) {
+      console.error('Error adding message:', error);
+      res.status(400).json({ error: 'Failed to add message', message: error?.message });
+    }
   });
 
   const httpServer = createServer(app);

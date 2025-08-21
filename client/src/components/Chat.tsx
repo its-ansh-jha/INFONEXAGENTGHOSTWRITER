@@ -4,6 +4,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Paperclip, Terminal, Trash2, Copy, Check } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { api } from '@/utils/api';
 
 interface Message {
   id: string;
@@ -12,6 +13,16 @@ interface Message {
   timestamp: Date;
   isCode?: boolean;
   fileName?: string;
+  conversationId?: string;
+  createdAt?: Date;
+  metadata?: any;
+}
+
+interface Conversation {
+  id: string;
+  title: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Mock welcome message
@@ -83,55 +94,200 @@ const processData = (items) => {
 ];
 
 export default function Chat() {
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const { isRecording, start: startRecording, stop: stopRecording } = useAudioRecorder();
   const { sendMessage: sendWSMessage, isConnected } = useWebSocket();
 
+  // Initialize conversation and load messages on mount
+  useEffect(() => {
+    initializeChat();
+  }, []);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSendMessage = () => {
-    if (!inputValue.trim()) return;
+  const initializeChat = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Check for existing conversations
+      const conversationsResponse = await api.conversations.getAll();
+      const conversationsData = await conversationsResponse.json();
+      
+      let conversation: Conversation;
+      
+      if (conversationsData.conversations && conversationsData.conversations.length > 0) {
+        // Use the most recent conversation
+        conversation = conversationsData.conversations[0];
+      } else {
+        // Create a new conversation
+        const newConversationResponse = await api.conversations.create({
+          title: 'New Chat Session'
+        });
+        const newConversationData = await newConversationResponse.json();
+        conversation = newConversationData.conversation;
+        
+        // Add welcome message
+        await api.conversations.addMessage(conversation.id, {
+          type: 'assistant',
+          content: welcomeMessage.content,
+          metadata: { isWelcome: true }
+        });
+      }
+      
+      setCurrentConversation(conversation);
+      await loadMessages(conversation.id);
+      setIsInitialized(true);
+    } catch (error) {
+      console.error('Error initializing chat:', error);
+      // Fallback to mock messages if API fails
+      setMessages(mockMessages);
+      setIsInitialized(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: inputValue,
-      timestamp: new Date(),
-    };
+  const loadMessages = async (conversationId: string) => {
+    try {
+      const response = await api.conversations.getMessages(conversationId);
+      const data = await response.json();
+      
+      const formattedMessages: Message[] = data.messages.map((msg: any) => ({
+        id: msg.id,
+        type: msg.type,
+        content: msg.content,
+        timestamp: new Date(msg.createdAt),
+        conversationId: msg.conversationId,
+        createdAt: new Date(msg.createdAt),
+        metadata: msg.metadata,
+        isCode: msg.metadata?.isCode || false,
+        fileName: msg.metadata?.fileName,
+      }));
+      
+      setMessages(formattedMessages);
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    }
+  };
 
-    setMessages(prev => [...prev, newMessage]);
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() || !currentConversation || isTyping) return;
+
+    const userMessageContent = inputValue.trim();
     setInputValue('');
-    
-    // Send to WebSocket if connected
-    if (isConnected) {
-      sendWSMessage({ type: 'chat', content: inputValue });
-    }
-
-    // Auto-resize textarea
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
-
-    // Simulate AI response (replace with actual WebSocket handling)
     setIsTyping(true);
-    setTimeout(() => {
-      const response: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: "I understand you'd like help with that. Let me analyze your request and provide assistance.",
-        timestamp: new Date(),
+
+    try {
+      // Save user message to database
+      const userMessageResponse = await api.conversations.addMessage(currentConversation.id, {
+        type: 'user',
+        content: userMessageContent,
+        metadata: {}
+      });
+      const userMessageData = await userMessageResponse.json();
+      
+      // Add user message to UI immediately
+      const userMessage: Message = {
+        id: userMessageData.message.id,
+        type: 'user',
+        content: userMessageContent,
+        timestamp: new Date(userMessageData.message.createdAt),
+        conversationId: currentConversation.id,
       };
-      setMessages(prev => [...prev, response]);
+      setMessages(prev => [...prev, userMessage]);
+
+      // Auto-resize textarea
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+
+      // Get AI response
+      const aiResponse = await api.gpt5.chat({
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert coding assistant. 
+
+            IMPORTANT RULES:
+            1. Keep responses concise - avoid showing large code blocks in chat
+            2. When creating OR editing files, use this exact format: CREATE_FILE: filename.ext \`\`\`file content here\`\`\`
+            3. For websites, create complete HTML files with inline CSS and JavaScript
+            4. After using CREATE_FILE, provide a brief description of what you created/edited
+            5. Focus on practical solutions rather than lengthy explanations
+            6. When building websites, make them fully functional with inline styles and scripts
+            7. IMPORTANT: When user asks to "edit" or "modify" or "update" a website/file, always provide the COMPLETE updated file content using CREATE_FILE format - this will replace the existing file
+            
+            Provide helpful guidance while keeping responses compact and actionable.`
+          },
+          ...messages.map(msg => ({ role: msg.type === 'assistant' ? 'assistant' : 'user', content: msg.content })),
+          { role: 'user', content: userMessageContent }
+        ],
+        max_tokens: 10000
+      });
+
+      const result = await aiResponse.json();
+      
+      if (result.success && result.data?.choices?.[0]?.message?.content) {
+        const assistantContent = result.data.choices[0].message.content;
+        
+        // Check if this is a code response
+        const isCodeResponse = assistantContent.includes('CREATE_FILE:') || assistantContent.includes('```');
+        
+        // Save assistant message to database
+        const assistantMessageResponse = await api.conversations.addMessage(currentConversation.id, {
+          type: 'assistant',
+          content: assistantContent,
+          metadata: { isCode: isCodeResponse }
+        });
+        const assistantMessageData = await assistantMessageResponse.json();
+        
+        // Add assistant message to UI
+        const assistantMessage: Message = {
+          id: assistantMessageData.message.id,
+          type: 'assistant',
+          content: assistantContent,
+          timestamp: new Date(assistantMessageData.message.createdAt),
+          conversationId: currentConversation.id,
+          isCode: isCodeResponse,
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        // Update conversation title if this is the first real exchange
+        if (messages.length <= 1) {
+          const title = userMessageContent.length > 50 
+            ? userMessageContent.substring(0, 50) + '...'
+            : userMessageContent;
+          await api.conversations.update(currentConversation.id, { title });
+          setCurrentConversation(prev => prev ? { ...prev, title } : null);
+        }
+      } else {
+        throw new Error('Failed to get AI response');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Add error message to UI
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        type: 'assistant',
+        content: 'Sorry, I encountered an error processing your request. Please try again.',
+        timestamp: new Date(),
+        conversationId: currentConversation.id,
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 2000);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -155,8 +311,31 @@ export default function Chat() {
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  const clearChat = () => {
-    setMessages([welcomeMessage]);
+  const clearChat = async () => {
+    if (!currentConversation) return;
+    
+    try {
+      // Create a new conversation
+      const newConversationResponse = await api.conversations.create({
+        title: 'New Chat Session'
+      });
+      const newConversationData = await newConversationResponse.json();
+      const newConversation = newConversationData.conversation;
+      
+      // Add welcome message
+      await api.conversations.addMessage(newConversation.id, {
+        type: 'assistant',
+        content: welcomeMessage.content,
+        metadata: { isWelcome: true }
+      });
+      
+      setCurrentConversation(newConversation);
+      await loadMessages(newConversation.id);
+    } catch (error) {
+      console.error('Error creating new chat:', error);
+      // Fallback to local clear
+      setMessages([welcomeMessage]);
+    }
   };
 
   const renderMessage = (message: Message) => {
@@ -249,6 +428,17 @@ export default function Chat() {
     );
   };
 
+  if (!isInitialized) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center text-vscode-text-muted">
+          <div className="w-8 h-8 border-2 border-vscode-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p>Loading chat...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col">
       {/* Chat Messages */}
@@ -296,7 +486,7 @@ export default function Chat() {
                 size="icon"
                 className="absolute right-3 top-3 text-vscode-primary hover:text-white disabled:text-vscode-text-muted"
                 onClick={handleSendMessage}
-                disabled={!inputValue.trim()}
+                disabled={!inputValue.trim() || isTyping || !currentConversation}
                 data-testid="button-send-message"
               >
                 <Send className="h-4 w-4" />

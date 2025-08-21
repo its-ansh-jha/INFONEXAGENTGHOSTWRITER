@@ -86,4 +86,39 @@ export const api = {
       body: formData,
       headers: {}, // Let browser set Content-Type for FormData
     }),
+    
+  // Chat/GPT-5 endpoints
+  gpt5: {
+    chat: (data: any) => fetch('/api/gpt5/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  },
+  
+  // Conversation endpoints
+  conversations: {
+    getAll: () => fetch('/api/conversations'),
+    create: (data: { title: string }) => fetch('/api/conversations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+    get: (id: string) => fetch(`/api/conversations/${id}`),
+    update: (id: string, data: { title?: string }) => fetch(`/api/conversations/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+    delete: (id: string) => fetch(`/api/conversations/${id}`, {
+      method: 'DELETE',
+    }),
+    getMessages: (id: string) => fetch(`/api/conversations/${id}/messages`),
+    addMessage: (id: string, message: { type: string; content: string; metadata?: any }) => 
+      fetch(`/api/conversations/${id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(message),
+      }),
+  },
 };
