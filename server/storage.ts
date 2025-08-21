@@ -3,6 +3,8 @@ import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import { eq, desc } from "drizzle-orm";
+import { writeFileSync, readFileSync, mkdirSync, readdirSync, statSync, existsSync } from 'fs';
+import { join, extname } from 'path';
 
 // modify the interface with any CRUD methods
 // you might need
@@ -177,17 +179,73 @@ export class PostgresStorage implements IStorage {
   }
 
   getProjectFiles(projectName: string): Array<{name: string, type: string}> {
-    // For now, return empty array - this would require file system integration
-    return [];
+    const projectPath = join(process.cwd(), 'projects', projectName);
+    
+    if (!existsSync(projectPath)) {
+      return [];
+    }
+    
+    try {
+      const files = readdirSync(projectPath);
+      return files.map(fileName => {
+        const filePath = join(projectPath, fileName);
+        const stats = statSync(filePath);
+        const ext = extname(fileName);
+        
+        let type = 'file';
+        if (stats.isDirectory()) {
+          type = 'directory';
+        } else if (['.html', '.htm'].includes(ext)) {
+          type = 'html';
+        } else if (['.js', '.jsx', '.ts', '.tsx'].includes(ext)) {
+          type = 'javascript';
+        } else if (['.css', '.scss', '.sass'].includes(ext)) {
+          type = 'css';
+        } else if (['.json'].includes(ext)) {
+          type = 'json';
+        } else if (['.md', '.txt'].includes(ext)) {
+          type = 'text';
+        }
+        
+        return { name: fileName, type };
+      }).filter(file => file.type !== 'directory'); // Only return files, not directories
+    } catch (error) {
+      console.error(`Error reading project files for ${projectName}:`, error);
+      return [];
+    }
   }
 
   getFileContent(projectName: string, fileName: string): string {
-    // For now, return empty string - this would require file system integration
-    return '';
+    const filePath = join(process.cwd(), 'projects', projectName, fileName);
+    
+    try {
+      if (existsSync(filePath)) {
+        return readFileSync(filePath, 'utf-8');
+      }
+      return '';
+    } catch (error) {
+      console.error(`Error reading file ${fileName} in project ${projectName}:`, error);
+      return '';
+    }
   }
 
   saveFile(projectName: string, fileName: string, content: string): void {
-    // For now, do nothing - this would require file system integration
+    const projectPath = join(process.cwd(), 'projects', projectName);
+    const filePath = join(projectPath, fileName);
+    
+    try {
+      // Create project directory if it doesn't exist
+      if (!existsSync(projectPath)) {
+        mkdirSync(projectPath, { recursive: true });
+      }
+      
+      // Write the file
+      writeFileSync(filePath, content, 'utf-8');
+      console.log(`File saved: ${filePath}`);
+    } catch (error) {
+      console.error(`Error saving file ${fileName} in project ${projectName}:`, error);
+      throw error;
+    }
   }
 
   async createConversation(insertConversation: InsertConversation): Promise<Conversation> {
