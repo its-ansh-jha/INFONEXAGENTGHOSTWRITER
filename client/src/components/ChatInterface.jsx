@@ -114,12 +114,29 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
       };
       setMessages(prev => [...prev, userMessage]);
 
+      // Get current project files to provide context to AI
+      let projectFilesContext = '';
+      try {
+        const filesResponse = await api.getProjectFiles(selectedProject.name);
+        const filesData = await filesResponse.json();
+        
+        if (filesData.files && filesData.files.length > 0) {
+          projectFilesContext = `\n\nCURRENT PROJECT FILES:
+${filesData.files.map(f => `- ${f.name} (${f.type})`).join('\n')}
+
+When referencing or modifying existing files, use the exact filenames listed above.
+If user asks you to copy or base a new file on an existing one, make sure to maintain consistency with the existing project structure.`;
+        }
+      } catch (error) {
+        console.error('Error fetching project files:', error);
+      }
+
       // Call GPT-5 API
       const response = await api.gpt5.chat({
         messages: [
           {
             role: 'system',
-            content: `You are an expert coding assistant for the project "${selectedProject?.displayName || 'Unknown Project'}". 
+            content: `You are an expert coding assistant for the project "${selectedProject?.displayName || 'Unknown Project'}".${projectFilesContext}
 
             IMPORTANT RULES:
             1. Keep responses concise - avoid showing large code blocks in chat
@@ -129,6 +146,7 @@ const ChatInterface = ({ selectedProject, selectedSession }) => {
             5. Focus on practical solutions rather than lengthy explanations
             6. When building websites, make them fully functional with inline styles and scripts
             7. IMPORTANT: When user asks to "edit" or "modify" or "update" a website/file, always provide the COMPLETE updated file content using CREATE_FILE format - this will replace the existing file
+            8. When user asks to create a file based on an existing file, reference the existing project files listed above and maintain consistency
             
             Example: If user asks for a website, respond with:
             "I'll create a complete website for you.
