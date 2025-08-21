@@ -3,6 +3,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertConversationSchema, insertMessageSchema } from "@shared/schema";
 import OpenAI from 'openai';
+import archiver from 'archiver';
+import { existsSync, createReadStream, statSync, readdirSync } from 'fs';
+import { join } from 'path';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -227,6 +230,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Error adding message:', error);
       res.status(400).json({ error: 'Failed to add message', message: error?.message });
+    }
+  });
+
+  // Download project as zip
+  app.get("/api/projects/:projectName/download", async (req, res) => {
+    try {
+      const { projectName } = req.params;
+      const projectPath = join(process.cwd(), 'projects', projectName);
+      
+      if (!existsSync(projectPath)) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${projectName}.zip"`);
+      
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      
+      archive.on('error', (err) => {
+        console.error('Archive error:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Failed to create zip file' });
+        }
+      });
+      
+      archive.pipe(res);
+      
+      // Add all files in the project directory to the zip
+      const files = readdirSync(projectPath);
+      for (const file of files) {
+        const filePath = join(projectPath, file);
+        const stats = statSync(filePath);
+        
+        if (stats.isFile()) {
+          archive.file(filePath, { name: file });
+        }
+      }
+      
+      await archive.finalize();
+      console.log(`Project ${projectName} downloaded as zip`);
+      
+    } catch (error: any) {
+      console.error('Error creating project zip:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to create zip file' });
+      }
     }
   });
 

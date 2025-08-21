@@ -45,6 +45,15 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ content }),
   }),
+  downloadProject: (projectName) => {
+    // Create a link and trigger download
+    const link = document.createElement('a');
+    link.href = `${API_BASE}/projects/${projectName}/download`;
+    link.download = `${projectName}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  },
   
   // Conversations API
   conversations: {

@@ -1,8 +1,10 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import { Download } from 'lucide-react';
 import ChatInterface from './ChatInterface';
 import FileManager from './FileManager';
 import PreviewPane from './PreviewPane';
+import { api } from '../utils/api';
 
 const MainContent = ({ 
   selectedProject, 
@@ -11,6 +13,11 @@ const MainContent = ({
   setActiveTab, 
   onToggleSidebar 
 }) => {
+  const handleDownloadProject = () => {
+    if (selectedProject) {
+      api.downloadProject(selectedProject.name);
+    }
+  };
   return (
     <main className="flex-1 flex flex-col bg-vscode-bg">
       {/* Header */}
@@ -58,6 +65,17 @@ const MainContent = ({
             >
               Preview
             </Button>
+            {selectedProject && (
+              <Button
+                variant="outline"
+                onClick={handleDownloadProject}
+                className="text-sm flex items-center space-x-2"
+                data-testid="button-download-project"
+              >
+                <Download className="h-4 w-4" />
+                <span>Download</span>
+              </Button>
+            )}
           </div>
         </div>
       </header>

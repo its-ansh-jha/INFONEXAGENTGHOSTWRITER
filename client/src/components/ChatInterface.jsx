@@ -147,6 +147,8 @@ If user asks you to copy or base a new file on an existing one, make sure to mai
             6. When building websites, make them fully functional with inline styles and scripts
             7. IMPORTANT: When user asks to "edit" or "modify" or "update" a website/file, always provide the COMPLETE updated file content using CREATE_FILE format - this will replace the existing file
             8. When user asks to create a file based on an existing file, reference the existing project files listed above and maintain consistency
+            9. If you need to see the content of an existing file to help with your response, use this format: VIEW_FILE: filename.ext
+            10. You can view multiple files if needed: VIEW_FILE: file1.html VIEW_FILE: file2.css
             
             Example: If user asks for a website, respond with:
             "I'll create a complete website for you.
@@ -180,7 +182,44 @@ If user asks you to copy or base a new file on an existing one, make sure to mai
       const result = await response.json();
       
       if (result.success && result.data.choices?.[0]?.message) {
-        const content = result.data.choices[0].message.content;
+        let content = result.data.choices[0].message.content;
+        
+        // Check if the AI wants to view files first
+        const viewFileMatches = content.match(/VIEW_FILE:\s*(\S+)/g);
+        if (viewFileMatches && selectedProject) {
+          let fileContents = '';
+          for (const match of viewFileMatches) {
+            const fileName = match.replace(/VIEW_FILE:\s*/, '').trim();
+            try {
+              const fileResponse = await api.getFileContent(selectedProject.name, fileName);
+              const fileData = await fileResponse.json();
+              fileContents += `\n\n--- Content of ${fileName} ---\n${fileData.content || 'File not found or empty'}\n--- End of ${fileName} ---`;
+            } catch (error) {
+              console.error(`Error reading file ${fileName}:`, error);
+              fileContents += `\n\n--- Error reading ${fileName} ---\n`;
+            }
+          }
+          
+          if (fileContents) {
+            // Send file contents back to AI for a follow-up response
+            const followUpResponse = await api.gpt5.chat({
+              messages: [
+                {
+                  role: 'system',
+                  content: `Here are the file contents you requested:${fileContents}\n\nNow provide your response based on this information. Do not show the file contents in your response unless specifically asked.`
+                },
+                ...messages.map(msg => ({ role: msg.role, content: msg.content })),
+                { role: 'user', content: userMessageContent }
+              ],
+              max_tokens: 10000
+            });
+            
+            const followUpResult = await followUpResponse.json();
+            if (followUpResult.success && followUpResult.data.choices?.[0]?.message) {
+              content = followUpResult.data.choices[0].message.content;
+            }
+          }
+        }
         
         // Check if the AI wants to create a file
         const fileMatch = content.match(/CREATE_FILE:\s*(\S+)\s*```([\s\S]*?)```/);
@@ -253,6 +292,15 @@ If user asks you to copy or base a new file on an existing one, make sure to mai
       } else {
         throw new Error('No valid response received from AI');
       }
+      // Update conversation title if this is the first real exchange
+      if (messages.length <= 1) {
+        const title = userMessageContent.length > 50 
+          ? userMessageContent.substring(0, 50) + '...'
+          : userMessageContent;
+        await api.conversations.update(currentConversation.id, { title });
+        setCurrentConversation(prev => prev ? { ...prev, title } : null);
+      }
+
     } catch (error) {
       console.error('Chat error:', error);
       // Save error message to database if conversation exists
