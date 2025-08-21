@@ -1,11 +1,14 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { insertConversationSchema, insertMessageSchema } from "@shared/schema";
+import { Router } from 'express';
+import { storage } from './storage';
+import gpt5Routes from './routes/gpt5';
+import { writeFile, mkdir, readFile } from 'fs/promises';
+import { join, dirname } from 'path';
 import OpenAI from 'openai';
 import archiver from 'archiver';
 import { existsSync, createReadStream, statSync, readdirSync } from 'fs';
-import { join } from 'path';
+import { join as pathJoin } from 'path';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -101,11 +104,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Handle tool calls if present
       if (response.choices[0].message.tool_calls) {
         const toolResults = [];
-        
+
         for (const toolCall of response.choices[0].message.tool_calls) {
           const { name, arguments: args } = toolCall.function;
           const parsedArgs = JSON.parse(args);
-          
+
           try {
             let result;
             switch (name) {
@@ -113,7 +116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 try {
                   const projectPath = join(process.cwd(), 'projects', project_name || 'sample-project');
                   const filePath = join(projectPath, parsedArgs.filename);
-                  
+
                   if (existsSync(filePath)) {
                     const fs = await import('fs/promises');
                     const content = await fs.readFile(filePath, 'utf-8');
@@ -125,12 +128,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   result = `Error reading file: ${error.message}`;
                 }
                 break;
-                
+
               case 'write_file':
                 try {
                   const projectPath = join(process.cwd(), 'projects', project_name || 'sample-project');
                   const filePath = join(projectPath, parsedArgs.filename);
-                  
+
                   const fs = await import('fs/promises');
                   // Ensure directory exists
                   await fs.mkdir(projectPath, { recursive: true });
@@ -140,11 +143,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   result = `Error writing file: ${error.message}`;
                 }
                 break;
-                
+
               case 'list_files':
                 try {
                   const projectPath = join(process.cwd(), 'projects', project_name || 'sample-project');
-                  
+
                   if (existsSync(projectPath)) {
                     const files = readdirSync(projectPath);
                     const filesList = files.map(fileName => {
@@ -160,11 +163,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   result = `Error listing files: ${error.message}`;
                 }
                 break;
-                
+
               default:
                 result = `Unknown tool: ${name}`;
             }
-            
+
             toolResults.push({
               tool_call_id: toolCall.id,
               role: "tool",
@@ -197,7 +200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error: any) {
       console.error('GPT-5 API Error:', error);
-      
+
       if (error.status === 401) {
         return res.status(401).json({ 
           error: 'Invalid OpenAI API key',
@@ -227,18 +230,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/projects", async (req, res) => {
     try {
       const { name, displayName, path } = req.body;
-      
+
       if (!name) {
         return res.status(400).json({ error: "Project name is required" });
       }
-      
+
       const projectData = {
         name: name.toLowerCase().replace(/\s+/g, '-'),
         displayName: displayName || name,
         path: path || `./${name.toLowerCase().replace(/\s+/g, '-')}`,
         createdAt: new Date().toISOString()
       };
-      
+
       const newProject = await storage.createProject(projectData);
       res.json({ success: true, project: newProject });
     } catch (error: any) {
@@ -274,11 +277,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { projectName, fileName } = req.params;
       const { content } = req.body;
-      
+
       if (content === undefined || content === null) {
         return res.status(400).json({ error: "File content is required" });
       }
-      
+
       await storage.saveFile(projectName, fileName, content);
       res.json({ success: true, message: "File updated successfully" });
     } catch (error: any) {
@@ -291,7 +294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/conversations", async (req, res) => {
     try {
       const { projectName } = req.query;
-      
+
       if (projectName) {
         // Get conversations for specific project
         const conversations = await storage.getProjectConversations(projectName as string);
@@ -322,11 +325,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const conversation = await storage.getConversation(id);
-      
+
       if (!conversation) {
         return res.status(404).json({ error: 'Conversation not found' });
       }
-      
+
       res.json({ conversation });
     } catch (error: any) {
       console.error('Error fetching conversation:', error);
@@ -339,11 +342,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const updates = insertConversationSchema.partial().parse(req.body);
       const conversation = await storage.updateConversation(id, updates);
-      
+
       if (!conversation) {
         return res.status(404).json({ error: 'Conversation not found' });
       }
-      
+
       res.json({ success: true, conversation });
     } catch (error: any) {
       console.error('Error updating conversation:', error);
@@ -355,11 +358,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const deleted = await storage.deleteConversation(id);
-      
+
       if (!deleted) {
         return res.status(404).json({ error: 'Conversation not found' });
       }
-      
+
       res.json({ success: true, message: 'Conversation deleted' });
     } catch (error: any) {
       console.error('Error deleting conversation:', error);
@@ -370,13 +373,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/conversations/:id/messages", async (req, res) => {
     try {
       const { id } = req.params;
-      
+
       // Verify conversation exists
       const conversation = await storage.getConversation(id);
       if (!conversation) {
         return res.status(404).json({ error: 'Conversation not found' });
       }
-      
+
       const messages = await storage.getMessages(id);
       res.json({ messages });
     } catch (error: any) {
@@ -388,17 +391,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/conversations/:id/messages", async (req, res) => {
     try {
       const { id } = req.params;
-      
+
       // Verify conversation exists
       const conversation = await storage.getConversation(id);
       if (!conversation) {
         return res.status(404).json({ error: 'Conversation not found' });
       }
-      
+
       const messageData = { ...req.body, conversationId: id };
       const validatedData = insertMessageSchema.parse(messageData);
       const message = await storage.addMessage(validatedData);
-      
+
       res.json({ success: true, message });
     } catch (error: any) {
       console.error('Error adding message:', error);
@@ -411,39 +414,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { projectName } = req.params;
       const projectPath = join(process.cwd(), 'projects', projectName);
-      
+
       if (!existsSync(projectPath)) {
         return res.status(404).json({ error: 'Project not found' });
       }
-      
+
       res.setHeader('Content-Type', 'application/zip');
       res.setHeader('Content-Disposition', `attachment; filename="${projectName}.zip"`);
-      
+
       const archive = archiver('zip', { zlib: { level: 9 } });
-      
+
       archive.on('error', (err) => {
         console.error('Archive error:', err);
         if (!res.headersSent) {
           res.status(500).json({ error: 'Failed to create zip file' });
         }
       });
-      
+
       archive.pipe(res);
-      
+
       // Add all files in the project directory to the zip
       const files = readdirSync(projectPath);
       for (const file of files) {
         const filePath = join(projectPath, file);
         const stats = statSync(filePath);
-        
+
         if (stats.isFile()) {
           archive.file(filePath, { name: file });
         }
       }
-      
+
       await archive.finalize();
       console.log(`Project ${projectName} downloaded as zip`);
-      
+
     } catch (error: any) {
       console.error('Error creating project zip:', error);
       if (!res.headersSent) {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useQuery } from '@tanstack/react-query';
 
 const Sidebar = ({ 
   projects, 
@@ -12,6 +13,14 @@ const Sidebar = ({
   isOpen, 
   onClose 
 }) => {
+  const { data: projectsData = [], isLoading, error } = useQuery({
+    queryKey: ['projects'],
+    queryFn: fetchProjects,
+  });
+
+  // Ensure projects is always an array
+  const safeProjects = Array.isArray(projectsData) ? projectsData : [];
+
   return (
     <aside className={`
       fixed md:relative top-0 left-0 h-full w-80 bg-vscode-surface border-r border-vscode-border
@@ -31,7 +40,7 @@ const Sidebar = ({
           </Button>
         </div>
       </div>
-      
+
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
           <div>
@@ -47,7 +56,7 @@ const Sidebar = ({
                 + New
               </Button>
             </div>
-            {projects.length === 0 ? (
+            {safeProjects.length === 0 ? (
               <div className="text-center py-6">
                 <p className="text-sm text-vscode-text-muted mb-3">No projects found</p>
                 <Button 
@@ -59,7 +68,7 @@ const Sidebar = ({
               </div>
             ) : (
               <div className="space-y-2">
-                {projects.map((project, index) => (
+                {safeProjects.map((project, index) => (
                   <div
                     key={project.name || index}
                     className={`
@@ -84,7 +93,7 @@ const Sidebar = ({
               </div>
             )}
           </div>
-          
+
           {selectedProject && selectedProject.sessions && (
             <div>
               <h3 className="text-sm font-medium text-vscode-text-muted mb-2">Sessions</h3>
