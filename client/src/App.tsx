@@ -1,164 +1,108 @@
-/*
- * App.jsx - Main Application Component with Session Protection System
- * 
- * SESSION PROTECTION SYSTEM OVERVIEW:
- * ===================================
- * 
- * Problem: Automatic project updates from WebSocket would refresh the sidebar and clear chat messages
- * during active conversations, creating a poor user experience.
- * 
- * Solution: Track "active sessions" and pause project updates during conversations.
- * 
- * How it works:
- * 1. When user sends message → session marked as "active" 
- * 2. Project updates are skipped while session is active
- * 3. When conversation completes/aborts → session marked as "inactive"
- * 4. Project updates resume normally
- * 
- * Handles both existing sessions (with real IDs) and new sessions (with temporary IDs).
- */
-
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
-import NewProjectDialog from './components/NewProjectDialog';
+import './index.css';
 
-import { useWebSocket } from './utils/websocket';
-import { ThemeProvider } from './contexts/ThemeContext';
-import { useVersionCheck } from './hooks/useVersionCheck';
-import { api } from './utils/api';
+const queryClient = new QueryClient();
 
+interface Project {
+  id: string;
+  name: string;
+  displayName: string;
+  path: string;
+  sessions?: any[];
+}
 
-// Main App component with routing
+interface Session {
+  id: string;
+  title: string;
+  lastActivity: string;
+}
+
 function AppContent() {
-  const navigate = useNavigate();
-  const { sessionId } = useParams();
-  
-  const { updateAvailable, latestVersion, currentVersion } = useVersionCheck('siteboon', 'claudecodeui');
-  const [showVersionModal, setShowVersionModal] = useState(false);
-  
-  const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState(null);
-  const [selectedSession, setSelectedSession] = useState(null);
-  const [activeTab, setActiveTab] = useState('chat'); // 'chat' or 'files'
-  const [isMobile, setIsMobile] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isLoadingProjects, setIsLoadingProjects] = useState(true);
-  const [isInputFocused, setIsInputFocused] = useState(false);
-  const [showToolsSettings, setShowToolsSettings] = useState(false);
-  const [showQuickSettings, setShowQuickSettings] = useState(false);
-  const [autoExpandTools, setAutoExpandTools] = useState(() => {
-    const saved = localStorage.getItem('autoExpandTools');
-    return saved !== null ? JSON.parse(saved) : false;
-  });
-  const [showRawParameters, setShowRawParameters] = useState(() => {
-    const saved = localStorage.getItem('showRawParameters');
-    return saved !== null ? JSON.parse(saved) : false;
-  });
-  const [autoScrollToBottom, setAutoScrollToBottom] = useState(() => {
-    const saved = localStorage.getItem('autoScrollToBottom');
-    return saved !== null ? JSON.parse(saved) : true;
-  });
-  const [sendByCtrlEnter, setSendByCtrlEnter] = useState(() => {
-    const saved = localStorage.getItem('sendByCtrlEnter');
-    return saved !== null ? JSON.parse(saved) : false;
-  });
-  const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
-  // Session Protection System: Track sessions with active conversations to prevent
-  // automatic project updates from interrupting ongoing chats. When a user sends
-  // a message, the session is marked as "active" and project updates are paused
-  // until the conversation completes or is aborted.
-  const [activeSessions, setActiveSessions] = useState(new Set()); // Track sessions with active conversations
-  
-  const { ws, sendMessage, messages } = useWebSocket();
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  useEffect(() => {
-    // Fetch projects on component mount
-    fetchProjects();
-  }, []);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const fetchProjects = async () => {
     try {
-      setIsLoadingProjects(true);
-      const response = await api.projects();
-      const data = await response.json();
-      
-      setProjects(data || []);
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-    } finally {
-      setIsLoadingProjects(false);
-    }
-  };
+      const response = await fetch('/api/projects');
+      if (response.ok) {
+        const data = await response.json();
+        setProjects(Array.isArray(data) ? data : []);
 
-  const handleCreateProject = async (projectData) => {
-    try {
-      const response = await api.createProject(projectData);
-      const result = await response.json();
-      
-      if (result.success) {
-        // Refresh projects list
-        await fetchProjects();
-        // Select the new project
-        setSelectedProject(result.project);
+        // Auto-select first project if none selected
+        if (!selectedProject && data.length > 0) {
+          setSelectedProject(data[0]);
+        }
+      } else {
+        console.error('Failed to fetch projects');
+        setProjects([]);
       }
     } catch (error) {
-      console.error('Error creating project:', error);
-      throw error;
+      console.error('Error fetching projects:', error);
+      setProjects([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  return (
-    <div className="bg-vscode-bg text-vscode-text font-sans h-screen overflow-hidden">
-      <div className="flex h-full">
-        <Sidebar 
-          projects={projects}
-          selectedProject={selectedProject}
-          selectedSession={selectedSession}
-          onProjectSelect={setSelectedProject}
-          onSessionSelect={setSelectedSession}
-          onNewProject={() => setShowNewProjectDialog(true)}
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-        />
-        <NewProjectDialog 
-          isOpen={showNewProjectDialog}
-          onClose={() => setShowNewProjectDialog(false)}
-          onCreateProject={handleCreateProject}
-        />
-        <MainContent 
-          selectedProject={selectedProject}
-          selectedSession={selectedSession}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-        />
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const onProjectSelect = (project: Project) => {
+    setSelectedProject(project);
+    setSelectedSession(null);
+  };
+
+  const onSessionSelect = (session: Session) => {
+    setSelectedSession(session);
+  };
+
+  const onNewProject = async (projectData: any) => {
+    await fetchProjects();
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-vscode-text">Loading...</div>
       </div>
+    );
+  }
+
+  return (
+    <div className="flex h-screen bg-vscode-background text-vscode-text">
+      <Sidebar
+        projects={projects}
+        selectedProject={selectedProject}
+        selectedSession={selectedSession}
+        onProjectSelect={onProjectSelect}
+        onSessionSelect={onSessionSelect}
+        onNewProject={onNewProject}
+        fetchProjects={fetchProjects}
+      />
+      <MainContent
+        selectedProject={selectedProject}
+        selectedSession={selectedSession}
+      />
     </div>
   );
 }
 
 function App() {
   return (
-    <ThemeProvider>
+    <QueryClientProvider client={queryClient}>
       <Router>
         <Routes>
           <Route path="/*" element={<AppContent />} />
         </Routes>
       </Router>
-    </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 
