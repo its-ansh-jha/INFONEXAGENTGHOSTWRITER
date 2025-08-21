@@ -7,7 +7,7 @@ import { writeFileSync, readFileSync, mkdirSync, readdirSync, statSync, existsSy
 import { join, extname } from 'path';
 import * as crypto from 'crypto';
 import { z } from 'zod';
-import { insertConversationSchema } from "@shared/schemas";
+import { insertConversationSchema } from "@shared/schema";
 
 // modify the interface with any CRUD methods
 // you might need

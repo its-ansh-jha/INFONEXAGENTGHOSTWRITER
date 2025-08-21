@@ -1,17 +1,24 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useQuery } from '@tanstack/react-query';
 
 const Sidebar = ({ 
-  projects, 
+  projects = [], 
   selectedProject, 
-  selectedSession, 
   onProjectSelect, 
-  onSessionSelect, 
-  onNewProject,
-  isOpen, 
-  onClose 
+  className,
+  isLoadingProjects,
+  conversations = [],
+  onConversationSelect,
+  selectedConversation,
+  onNewConversation,
+  showSettings,
+  onSettingsToggle,
+  onDeleteConversation,
+  starredProjects = [],
+  onToggleStarProject,
+  fetchProjects
 }) => {
   const { data: projectsData = [], isLoading, error } = useQuery({
     queryKey: ['projects'],
@@ -20,6 +27,26 @@ const Sidebar = ({
 
   // Ensure projects is always an array
   const safeProjects = Array.isArray(projectsData) ? projectsData : [];
+  
+  // Add search term state
+  const [searchTerm, setSearchTerm] = React.useState('');
+
+  const filteredProjects = useMemo(() => {
+    if (!Array.isArray(projects) || !searchTerm.trim()) return projects || [];
+
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return projects.filter(project => 
+      project.displayName?.toLowerCase().includes(lowerSearchTerm) ||
+      project.name?.toLowerCase().includes(lowerSearchTerm)
+    );
+  }, [projects, searchTerm]);
+
+  // Add missing functions
+  const toggleStarProject = onToggleStarProject || (() => {});
+  const handleRefresh = fetchProjects || (() => {});
+  const handleNewProject = () => {};
+  const handleDeleteProject = () => {};
+  const handleRenameProject = () => {};
 
   return (
     <aside className={`
@@ -38,6 +65,16 @@ const Sidebar = ({
           >
             ×
           </Button>
+        </div>
+        {/* Search input */}
+        <div className="mt-4">
+          <input
+            type="text"
+            placeholder="Search projects..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-3 py-2 rounded-md bg-vscode-input text-vscode-text border border-vscode-border focus:outline-none focus:ring-2 focus:ring-vscode-primary focus:border-transparent"
+          />
         </div>
       </div>
 
