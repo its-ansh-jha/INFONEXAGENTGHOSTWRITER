@@ -34,10 +34,10 @@ import { api } from './utils/api';
 function AppContent() {
   const navigate = useNavigate();
   const { sessionId } = useParams();
-  
+
   const { updateAvailable, latestVersion, currentVersion } = useVersionCheck('siteboon', 'claudecodeui');
   const [showVersionModal, setShowVersionModal] = useState(false);
-  
+
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -45,6 +45,8 @@ function AppContent() {
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(true); // State for loading conversations
+  const [conversations, setConversations] = useState([]); // State for conversations
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [showToolsSettings, setShowToolsSettings] = useState(false);
   const [showQuickSettings, setShowQuickSettings] = useState(false);
@@ -58,7 +60,7 @@ function AppContent() {
   });
   const [autoScrollToBottom, setAutoScrollToBottom] = useState(() => {
     const saved = localStorage.getItem('autoScrollToBottom');
-    return saved !== null ? JSON.parse(saved) : true;
+    return saved !== null ? JSON.JSON.parse(saved) : true;
   });
   const [sendByCtrlEnter, setSendByCtrlEnter] = useState(() => {
     const saved = localStorage.getItem('sendByCtrlEnter');
@@ -70,31 +72,40 @@ function AppContent() {
   // a message, the session is marked as "active" and project updates are paused
   // until the conversation completes or is aborted.
   const [activeSessions, setActiveSessions] = useState(new Set()); // Track sessions with active conversations
-  
+
   const { ws, sendMessage, messages } = useWebSocket();
 
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   useEffect(() => {
-    // Fetch projects on component mount
+    // Fetch initial data
     fetchProjects();
+    fetchConversations();
   }, []);
+
+  useEffect(() => {
+    // Fetch conversations for selected project
+    if (selectedProject) {
+      fetchConversations(selectedProject.name);
+      setSelectedSession(null); // Clear selected session when project changes
+    }
+  }, [selectedProject]);
 
   const fetchProjects = async () => {
     try {
       setIsLoadingProjects(true);
       const response = await api.projects();
       const data = await response.json();
-      
+
       setProjects(data || []);
     } catch (error) {
       console.error('Error fetching projects:', error);
@@ -103,11 +114,26 @@ function AppContent() {
     }
   };
 
+  const fetchConversations = async (projectName?: string) => {
+    try {
+      setIsLoadingConversations(true);
+      const url = projectName ? `/api/conversations?projectName=${projectName}` : '/api/conversations';
+      const response = await fetch(url);
+      const data = await response.json();
+
+      setConversations(data.conversations || []);
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+    } finally {
+      setIsLoadingConversations(false);
+    }
+  };
+
   const handleCreateProject = async (projectData) => {
     try {
       const response = await api.createProject(projectData);
       const result = await response.json();
-      
+
       if (result.success) {
         // Refresh projects list
         await fetchProjects();
@@ -144,6 +170,8 @@ function AppContent() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          conversations={conversations} // Pass conversations to MainContent
+          isLoadingConversations={isLoadingConversations} // Pass loading state
         />
       </div>
     </div>
