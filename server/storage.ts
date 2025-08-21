@@ -5,9 +5,6 @@ import { neon } from "@neondatabase/serverless";
 import { eq, desc } from "drizzle-orm";
 import { writeFileSync, readFileSync, mkdirSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, extname } from 'path';
-import * as crypto from 'crypto';
-import { z } from 'zod';
-import { insertConversationSchema } from "@shared/schemas";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -17,18 +14,13 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   // File management methods
-  getProjectFiles?(projectName: string): Promise<Array<{name: string, type: string}>>;
-  getFileContent?(projectName: string, fileName: string): Promise<string>;
-  saveFile?(projectName: string, fileName: string, content: string): Promise<void>;
-  // Project management methods
-  getAllProjects?(): Promise<any[]>;
-  createProject?(projectData: any): Promise<any>;
-  getProject?(projectName: string): Promise<any | null>;
+  getProjectFiles?(projectName: string): Array<{name: string, type: string}>;
+  getFileContent?(projectName: string, fileName: string): string;
+  saveFile?(projectName: string, fileName: string, content: string): void;
   // Chat management methods
   createConversation(conversation: InsertConversation): Promise<Conversation>;
   getConversation(id: string): Promise<Conversation | undefined>;
   getAllConversations(): Promise<Conversation[]>;
-  getProjectConversations?(projectName: string): Promise<Conversation[]>;
   updateConversation(id: string, updates: Partial<InsertConversation>): Promise<Conversation | undefined>;
   addMessage(message: InsertMessage): Promise<Message>;
   getMessages(conversationId: string): Promise<Message[]>;
@@ -37,34 +29,15 @@ export interface IStorage {
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
-  private projectFiles: Record<string, any[]>;
-  private fileContents: Record<string, Record<string, string>>;
-  private conversations: Conversation[];
-  private messages: Message[];
-  private projects: any[];
+  private projectFiles: Map<string, Map<string, string>>;
+  private conversations: Map<string, Conversation>;
+  private messages: Map<string, Message[]>;
 
   constructor() {
     this.users = new Map();
-    this.projectFiles = {
-      "sample-project": [
-        { name: "index.html", type: "file", content: "" },
-        { name: "portfolio.html", type: "file", content: "" }
-      ]
-    };
-    this.fileContents = {
-      "sample-project": {}
-    };
-    this.conversations = [];
-    this.messages = [];
-    this.projects = [
-      {
-        id: "sample-project",
-        name: "sample-project",
-        displayName: "Sample Project",
-        path: "./sample-project",
-        createdAt: new Date().toISOString()
-      }
-    ];
+    this.projectFiles = new Map();
+    this.conversations = new Map();
+    this.messages = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -84,57 +57,30 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  async getAllProjects(): Promise<any[]> {
-    return this.projects;
+  getProjectFiles(projectName: string): Array<{name: string, type: string}> {
+    const files = this.projectFiles.get(projectName);
+    if (!files) return [];
+    
+    return Array.from(files.keys()).map(fileName => ({
+      name: fileName,
+      type: fileName.endsWith('.html') ? 'html' : 
+            fileName.endsWith('.css') ? 'css' :
+            fileName.endsWith('.js') ? 'javascript' : 'text'
+    }));
   }
 
-  async createProject(projectData: any): Promise<any> {
-    const newProject = {
-      id: projectData.name,
-      ...projectData,
-      createdAt: new Date().toISOString()
-    };
-    this.projects.push(newProject);
-
-    // Initialize empty file structure for new project
-    this.projectFiles[projectData.name] = [];
-    this.fileContents[projectData.name] = {};
-
-    return newProject;
+  getFileContent(projectName: string, fileName: string): string {
+    const files = this.projectFiles.get(projectName);
+    return files?.get(fileName) || '';
   }
 
-  async getProject(projectName: string): Promise<any | null> {
-    return this.projects.find(p => p.name === projectName) || null;
-  }
-
-  async getProjectFiles(projectName: string): Promise<Array<{name: string, type: string}>> {
-    return this.projectFiles[projectName] || [];
-  }
-
-  async getFileContent(projectName: string, fileName: string): Promise<string> {
-    return this.fileContents[projectName]?.[fileName] || '';
-  }
-
-  async saveFile(projectName: string, fileName: string, content: string): Promise<void> {
-    if (!this.fileContents[projectName]) {
-      this.fileContents[projectName] = {};
+  saveFile(projectName: string, fileName: string, content: string): void {
+    if (!this.projectFiles.has(projectName)) {
+      this.projectFiles.set(projectName, new Map());
     }
-    this.fileContents[projectName][fileName] = content;
-
-    if (!this.projectFiles[projectName]) {
-      this.projectFiles[projectName] = [];
-    }
-
-    const existingFile = this.projectFiles[projectName].find(f => f.name === fileName);
-    if (!existingFile) {
-      this.projectFiles[projectName].push({
-        name: fileName,
-        type: 'file',
-        content: content
-      });
-    } else {
-      existingFile.content = content; // Update content if file exists
-    }
+    
+    const files = this.projectFiles.get(projectName)!;
+    files.set(fileName, content);
   }
 
   async createConversation(insertConversation: InsertConversation): Promise<Conversation> {
@@ -146,40 +92,31 @@ export class MemStorage implements IStorage {
       createdAt: now,
       updatedAt: now,
     };
-    this.conversations.push(conversation);
+    this.conversations.set(id, conversation);
+    this.messages.set(id, []);
     return conversation;
   }
 
   async getConversation(id: string): Promise<Conversation | undefined> {
-    return this.conversations.find(c => c.id === id);
+    return this.conversations.get(id);
   }
 
   async getAllConversations(): Promise<Conversation[]> {
-    return this.conversations.sort(
-      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
-    );
-  }
-
-  async getProjectConversations(projectName: string): Promise<Conversation[]> {
-    return this.conversations.filter(c => c.projectName === projectName).sort(
+    return Array.from(this.conversations.values()).sort(
       (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
     );
   }
 
   async updateConversation(id: string, updates: Partial<InsertConversation>): Promise<Conversation | undefined> {
-    const conversation = this.conversations.find(c => c.id === id);
+    const conversation = this.conversations.get(id);
     if (!conversation) return undefined;
-
+    
     const updated: Conversation = {
       ...conversation,
       ...updates,
       updatedAt: new Date(),
     };
-
-    const index = this.conversations.findIndex(c => c.id === id);
-    if (index !== -1) {
-      this.conversations[index] = updated;
-    }
+    this.conversations.set(id, updated);
     return updated;
   }
 
@@ -191,29 +128,26 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       metadata: insertMessage.metadata || null,
     };
-
-    this.messages.push(message);
-
+    
+    // Add to messages array for this conversation
+    const conversationMessages = this.messages.get(insertMessage.conversationId) || [];
+    conversationMessages.push(message);
+    this.messages.set(insertMessage.conversationId, conversationMessages);
+    
     // Update conversation's updatedAt timestamp
     await this.updateConversation(insertMessage.conversationId, {});
-
+    
     return message;
   }
 
   async getMessages(conversationId: string): Promise<Message[]> {
-    return this.messages.filter(m => m.conversationId === conversationId);
+    return this.messages.get(conversationId) || [];
   }
 
   async deleteConversation(id: string): Promise<boolean> {
-    const index = this.conversations.findIndex(c => c.id === id);
-    if (index !== -1) {
-      this.conversations.splice(index, 1);
-      // Also delete associated messages
-      const messageIndices = this.messages.map((m, i) => m.conversationId === id ? i : -1).filter(i => i !== -1);
-      messageIndices.reverse().forEach(i => this.messages.splice(i, 1));
-      return true;
-    }
-    return false;
+    const deleted = this.conversations.delete(id);
+    this.messages.delete(id);
+    return deleted;
   }
 }
 
@@ -244,39 +178,20 @@ export class PostgresStorage implements IStorage {
     return result[0];
   }
 
-  async getAllProjects(): Promise<any[]> {
-    const result = await this.db.select().from(projects);
-    return result;
-  }
-
-  async createProject(projectData: any): Promise<any> {
-    const newProject = {
-      ...projectData,
-      createdAt: new Date().toISOString()
-    };
-    const result = await this.db.insert(projects).values(newProject).returning();
-    return result[0];
-  }
-
-  async getProject(projectName: string): Promise<any | null> {
-    const result = await this.db.select().from(projects).where(eq(projects.name, projectName)).limit(1);
-    return result[0] || null;
-  }
-
-  async getProjectFiles(projectName: string): Promise<Array<{name: string, type: string}>> {
+  getProjectFiles(projectName: string): Array<{name: string, type: string}> {
     const projectPath = join(process.cwd(), 'projects', projectName);
-
+    
     if (!existsSync(projectPath)) {
       return [];
     }
-
+    
     try {
       const files = readdirSync(projectPath);
       return files.map(fileName => {
         const filePath = join(projectPath, fileName);
         const stats = statSync(filePath);
         const ext = extname(fileName);
-
+        
         let type = 'file';
         if (stats.isDirectory()) {
           type = 'directory';
@@ -291,7 +206,7 @@ export class PostgresStorage implements IStorage {
         } else if (['.md', '.txt'].includes(ext)) {
           type = 'text';
         }
-
+        
         return { name: fileName, type };
       }).filter(file => file.type !== 'directory'); // Only return files, not directories
     } catch (error) {
@@ -300,9 +215,9 @@ export class PostgresStorage implements IStorage {
     }
   }
 
-  async getFileContent(projectName: string, fileName: string): Promise<string> {
+  getFileContent(projectName: string, fileName: string): string {
     const filePath = join(process.cwd(), 'projects', projectName, fileName);
-
+    
     try {
       if (existsSync(filePath)) {
         return readFileSync(filePath, 'utf-8');
@@ -314,16 +229,16 @@ export class PostgresStorage implements IStorage {
     }
   }
 
-  async saveFile(projectName: string, fileName: string, content: string): Promise<void> {
+  saveFile(projectName: string, fileName: string, content: string): void {
     const projectPath = join(process.cwd(), 'projects', projectName);
     const filePath = join(projectPath, fileName);
-
+    
     try {
       // Create project directory if it doesn't exist
       if (!existsSync(projectPath)) {
         mkdirSync(projectPath, { recursive: true });
       }
-
+      
       // Write the file
       writeFileSync(filePath, content, 'utf-8');
       console.log(`File saved: ${filePath}`);
@@ -348,11 +263,6 @@ export class PostgresStorage implements IStorage {
     return result;
   }
 
-  async getProjectConversations(projectName: string): Promise<Conversation[]> {
-    const result = await this.db.select().from(conversations).where(eq(conversations.projectName, projectName)).orderBy(desc(conversations.updatedAt));
-    return result;
-  }
-
   async updateConversation(id: string, updates: Partial<InsertConversation>): Promise<Conversation | undefined> {
     const result = await this.db
       .update(conversations)
@@ -364,10 +274,10 @@ export class PostgresStorage implements IStorage {
 
   async addMessage(insertMessage: InsertMessage): Promise<Message> {
     const result = await this.db.insert(messages).values(insertMessage).returning();
-
+    
     // Update conversation's updatedAt timestamp
     await this.updateConversation(insertMessage.conversationId, {});
-
+    
     return result[0];
   }
 
@@ -387,4 +297,4 @@ export class PostgresStorage implements IStorage {
 }
 
 // Use PostgreSQL storage in production, fallback to memory storage for development
-export const storage: IStorage = process.env.DATABASE_URL ? new PostgresStorage() : new MemStorage();
+export const storage = process.env.DATABASE_URL ? new PostgresStorage() : new MemStorage();

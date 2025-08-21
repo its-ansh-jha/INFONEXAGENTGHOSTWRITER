@@ -20,7 +20,6 @@ export type User = typeof users.$inferSelect;
 export const conversations = pgTable("conversations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
-  projectName: text("project_name"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
@@ -34,9 +33,10 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
-export const insertConversationSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  projectName: z.string().optional(),
+export const insertConversationSchema = createInsertSchema(conversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export const insertMessageSchema = createInsertSchema(messages).omit({

@@ -212,95 +212,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all projects endpoint
-  app.get("/api/projects", async (req, res) => {
-    try {
-      const projects = await storage.getAllProjects();
-      res.json(projects);
-    } catch (error: any) {
-      console.error('Error fetching projects:', error);
-      res.status(500).json({ error: 'Failed to fetch projects' });
-    }
+  // Mock projects endpoint
+  app.get("/api/projects", (req, res) => {
+    res.json([
+      {
+        name: "sample-project",
+        displayName: "Sample Project",
+        path: "./sample-project",
+        sessions: []
+      }
+    ]);
   });
 
   // Create new project endpoint
-  app.post("/api/projects", async (req, res) => {
-    try {
-      const { name, displayName, path } = req.body;
-      
-      if (!name) {
-        return res.status(400).json({ error: "Project name is required" });
-      }
-      
-      const projectData = {
-        name: name.toLowerCase().replace(/\s+/g, '-'),
-        displayName: displayName || name,
-        path: path || `./${name.toLowerCase().replace(/\s+/g, '-')}`,
-        createdAt: new Date().toISOString()
-      };
-      
-      const newProject = await storage.createProject(projectData);
-      res.json({ success: true, project: newProject });
-    } catch (error: any) {
-      console.error('Error creating project:', error);
-      res.status(400).json({ error: 'Failed to create project', message: error?.message });
+  app.post("/api/projects", (req, res) => {
+    const { name, displayName, path } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: "Project name is required" });
     }
+    
+    const newProject = {
+      name: name.toLowerCase().replace(/\s+/g, '-'),
+      displayName: displayName || name,
+      path: path || `./${name.toLowerCase().replace(/\s+/g, '-')}`,
+      sessions: [],
+      createdAt: new Date().toISOString()
+    };
+    
+    res.json({ success: true, project: newProject });
   });
 
   // File management endpoints
-  app.get("/api/projects/:projectName/files", async (req, res) => {
-    try {
-      const { projectName } = req.params;
-      const files = await storage.getProjectFiles(projectName);
-      res.json({ files });
-    } catch (error: any) {
-      console.error('Error fetching project files:', error);
-      res.status(500).json({ error: 'Failed to fetch project files' });
-    }
+  app.get("/api/projects/:projectName/files", (req, res) => {
+    const { projectName } = req.params;
+    
+    // Mock file system - in real implementation, this would read from actual files
+    const mockFiles = storage.getProjectFiles ? storage.getProjectFiles(projectName) : [];
+    
+    res.json({ files: mockFiles });
   });
 
-  app.get("/api/projects/:projectName/files/:fileName", async (req, res) => {
-    try {
-      const { projectName, fileName } = req.params;
-      const content = await storage.getFileContent(projectName, fileName);
-      res.json({ content });
-    } catch (error: any) {
-      console.error('Error fetching file content:', error);
-      res.status(500).json({ error: 'Failed to fetch file content' });
-    }
+  app.get("/api/projects/:projectName/files/:fileName", (req, res) => {
+    const { projectName, fileName } = req.params;
+    
+    // Mock file content - in real implementation, this would read actual file content
+    const content = storage.getFileContent ? storage.getFileContent(projectName, fileName) : '';
+    
+    res.json({ content });
   });
 
-  app.post("/api/projects/:projectName/files/:fileName", async (req, res) => {
-    try {
-      const { projectName, fileName } = req.params;
-      const { content } = req.body;
-      
-      if (content === undefined || content === null) {
-        return res.status(400).json({ error: "File content is required" });
-      }
-      
-      await storage.saveFile(projectName, fileName, content);
-      res.json({ success: true, message: "File updated successfully" });
-    } catch (error: any) {
-      console.error('Error saving file:', error);
-      res.status(500).json({ error: 'Failed to save file' });
+  app.post("/api/projects/:projectName/files/:fileName", (req, res) => {
+    const { projectName, fileName } = req.params;
+    const { content } = req.body;
+    
+    if (content === undefined || content === null) {
+      return res.status(400).json({ error: "File content is required" });
     }
+    
+    // Mock file saving - in real implementation, this would write to actual files
+    // This will replace existing files or create new ones
+    if (storage.saveFile) {
+      storage.saveFile(projectName, fileName, content);
+    }
+    
+    res.json({ success: true, message: "File updated successfully" });
   });
 
   // Chat conversation endpoints
   app.get("/api/conversations", async (req, res) => {
     try {
-      const { projectName } = req.query;
-      
-      if (projectName) {
-        // Get conversations for specific project
-        const conversations = await storage.getProjectConversations(projectName as string);
-        res.json({ conversations });
-      } else {
-        // Get all conversations if no project specified
-        const conversations = await storage.getAllConversations();
-        res.json({ conversations });
-      }
+      const conversations = await storage.getAllConversations();
+      res.json({ conversations });
     } catch (error: any) {
       console.error('Error fetching conversations:', error);
       res.status(500).json({ error: 'Failed to fetch conversations' });
