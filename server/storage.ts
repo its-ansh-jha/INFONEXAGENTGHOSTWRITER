@@ -1,5 +1,8 @@
-import { type User, type InsertUser, type Conversation, type InsertConversation, type Message, type InsertMessage } from "@shared/schema";
+import { type User, type InsertUser, type Conversation, type InsertConversation, type Message, type InsertMessage, users, conversations, messages } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { drizzle } from "drizzle-orm/neon-http";
+import { neon } from "@neondatabase/serverless";
+import { eq, desc } from "drizzle-orm";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -146,4 +149,94 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// PostgreSQL Storage Implementation
+export class PostgresStorage implements IStorage {
+  private db;
+
+  constructor() {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is required');
+    }
+    const sql = neon(process.env.DATABASE_URL);
+    this.db = drizzle(sql);
+  }
+
+  async getUser(id: string): Promise<User | undefined> {
+    const result = await this.db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const result = await this.db.select().from(users).where(eq(users.username, username)).limit(1);
+    return result[0];
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const result = await this.db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  getProjectFiles(projectName: string): Array<{name: string, type: string}> {
+    // For now, return empty array - this would require file system integration
+    return [];
+  }
+
+  getFileContent(projectName: string, fileName: string): string {
+    // For now, return empty string - this would require file system integration
+    return '';
+  }
+
+  saveFile(projectName: string, fileName: string, content: string): void {
+    // For now, do nothing - this would require file system integration
+  }
+
+  async createConversation(insertConversation: InsertConversation): Promise<Conversation> {
+    const result = await this.db.insert(conversations).values(insertConversation).returning();
+    return result[0];
+  }
+
+  async getConversation(id: string): Promise<Conversation | undefined> {
+    const result = await this.db.select().from(conversations).where(eq(conversations.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAllConversations(): Promise<Conversation[]> {
+    const result = await this.db.select().from(conversations).orderBy(desc(conversations.updatedAt));
+    return result;
+  }
+
+  async updateConversation(id: string, updates: Partial<InsertConversation>): Promise<Conversation | undefined> {
+    const result = await this.db
+      .update(conversations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(conversations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async addMessage(insertMessage: InsertMessage): Promise<Message> {
+    const result = await this.db.insert(messages).values(insertMessage).returning();
+    
+    // Update conversation's updatedAt timestamp
+    await this.updateConversation(insertMessage.conversationId, {});
+    
+    return result[0];
+  }
+
+  async getMessages(conversationId: string): Promise<Message[]> {
+    const result = await this.db
+      .select()
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(messages.createdAt);
+    return result;
+  }
+
+  async deleteConversation(id: string): Promise<boolean> {
+    const result = await this.db.delete(conversations).where(eq(conversations.id, id)).returning();
+    return result.length > 0;
+  }
+}
+
+// Use PostgreSQL storage in production, fallback to memory storage for development
+export const storage = process.env.DATABASE_URL ? new PostgresStorage() : new MemStorage();
